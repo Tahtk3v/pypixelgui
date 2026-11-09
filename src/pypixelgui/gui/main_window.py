@@ -107,6 +107,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(outer)
 
         for dev in settings.devices:
+            manager.remember(dev.address, dev.kind, dev.panel, dev.password)
             self._upsert_item(dev.address, dev.name)
             if dev.hold:
                 manager.set_hold(dev.address, True)
@@ -163,9 +164,11 @@ class MainWindow(QMainWindow):
         box.setMinimumWidth(280)
         return box
 
-    def _send_row(self, text: str, slot) -> QPushButton:
+    def _send_row(self, text: str, slot, command: str | None = None) -> QPushButton:
+        """A button that needs a connected display (and, if given, support for ``command``)."""
         btn = QPushButton(text)
         btn.clicked.connect(slot)
+        btn.setProperty("command", command)
         self._action_buttons.append(btn)
         return btn
 
@@ -199,8 +202,11 @@ class MainWindow(QMainWindow):
                 self._action_buttons.remove(b)
         self._preset_buttons: list[QPushButton] = []
         by_cat: dict[str, list[presets_mod.Preset]] = {}
+        by_cat["My presets"] = []  # your own presets come first
         for p in presets_mod.all_presets(self.settings.presets):
             by_cat.setdefault(p.category, []).append(p)
+        if not by_cat["My presets"]:
+            del by_cat["My presets"]
         for cat, items in by_cat.items():
             box = QGroupBox(cat)
             grid = QGridLayout(box)
@@ -253,7 +259,39 @@ class MainWindow(QMainWindow):
                                       "swatch": swatch, "steps": [["send_text", params]]})
         self.save_settings()
         self._populate_presets()
-        self.log(f"Saved preset “{name}”")
+        self.log(f"Saved preset “{name}” – it's at the top of the Presets tab")
+
+    def _save_image_as_preset(self) -> None:
+        path = Path(self.image_path.text().strip())
+        if not path.is_file():
+            self.log("Pick an image file first.")
+            return
+        name, ok = QInputDialog.getText(self, "Save preset", "Preset name:", text=path.stem[:20])
+        name = name.strip()
+        if not ok or not name:
+            return
+        if any(p.name.lower() == name.lower() for p in presets_mod.BUILTIN):
+            QMessageBox.warning(self, "Name taken", f"“{name}” is a built-in preset name.")
+            return
+        import hashlib
+        import shutil
+        from ..config import media_dir
+        data = path.read_bytes()
+        stored = hashlib.sha1(data).hexdigest()[:16] + path.suffix.lower()
+        try:
+            media_dir().mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, media_dir() / stored)
+        except OSError as e:
+            self.log(f"Could not store the image: {e}")
+            return
+        self.settings.presets = [e for e in self.settings.presets if e["name"].lower() != name.lower()]
+        self.settings.presets.append({
+            "name": name, "description": f"Image: {path.name}",
+            "steps": [["image_file", {"file": stored, "resize_method": self.resize_combo.currentText(),
+                                      "budget_kb": self.image_budget.value()}]]})
+        self.save_settings()
+        self._populate_presets()
+        self.log(f"Saved preset “{name}” – it's at the top of the Presets tab")
 
     def _remove_user_preset(self) -> None:
         names = [e["name"] for e in self.settings.presets]
@@ -336,7 +374,12 @@ class MainWindow(QMainWindow):
         self.preview.setAlignment(Qt.AlignCenter)
         form.addRow("Preview", self.preview)
         self.send_image_btn = self._send_row("Send image", self._send_image)
-        form.addRow(self.send_image_btn)
+        save_img = QPushButton("Save as preset…")
+        save_img.clicked.connect(self._save_image_as_preset)
+        irow = QHBoxLayout()
+        irow.addWidget(self.send_image_btn)
+        irow.addWidget(save_img)
+        form.addRow(self._wrap(irow))
         self.upload_bar = QProgressBar()
         self.upload_bar.setVisible(False)
         form.addRow("", self.upload_bar)
@@ -353,8 +396,8 @@ class MainWindow(QMainWindow):
         form.addRow("", self.clock_24)
         form.addRow(self._send_row("Show clock", lambda: self._run("set_clock_mode", {
             "style": self.clock_style.value(), "show_date": self.clock_date.isChecked(),
-            "format_24": self.clock_24.isChecked()})))
-        form.addRow(self._send_row("Sync time from this computer", self._sync_time))
+            "format_24": self.clock_24.isChecked()}), "set_clock_mode"))
+        form.addRow(self._send_row("Sync time from this computer", self._sync_time, "set_time"))
         return w
 
     def _build_display_tab(self) -> QWidget:
@@ -370,15 +413,15 @@ class MainWindow(QMainWindow):
         row.addWidget(self.brightness_label)
         form.addRow("Brightness", self._wrap(row))
         prow = QHBoxLayout()
-        prow.addWidget(self._send_row("On", lambda: self._run("set_power", {"on": True})))
-        prow.addWidget(self._send_row("Off", lambda: self._run("set_power", {"on": False})))
+        prow.addWidget(self._send_row("On", lambda: self._run("set_power", {"on": True}), "set_power"))
+        prow.addWidget(self._send_row("Off", lambda: self._run("set_power", {"on": False}), "set_power"))
         form.addRow("Power", self._wrap(prow))
         self.orientation = QComboBox()
         self.orientation.addItems(["0°", "90°", "180°", "270°"])
         orow = QHBoxLayout()
         orow.addWidget(self.orientation)
         orow.addWidget(self._send_row("Apply", lambda: self._run(
-            "set_orientation", {"orientation": self.orientation.currentIndex()})))
+            "set_orientation", {"orientation": self.orientation.currentIndex()}), "set_orientation"))
         form.addRow("Orientation", self._wrap(orow))
         self.fun_mode = QCheckBox("Fun mode (enables per-pixel drawing)")
         self.fun_mode.clicked.connect(lambda on: self._run("set_fun_mode", {"enable": on}))
@@ -392,8 +435,8 @@ class MainWindow(QMainWindow):
         srow = QHBoxLayout()
         srow.addWidget(self.show_slot_spin)
         srow.addWidget(self._send_row("Show", lambda: self._run(
-            "show_slot", {"number": self.show_slot_spin.value()})))
-        srow.addWidget(self._send_row("Delete…", self._delete_slot))
+            "show_slot", {"number": self.show_slot_spin.value()}), "show_slot"))
+        srow.addWidget(self._send_row("Delete…", self._delete_slot, "delete"))
         form.addRow("Slot", self._wrap(srow))
         self.p1 = QSpinBox(maximum=999)
         self.p2 = QSpinBox(maximum=999)
@@ -402,14 +445,15 @@ class MainWindow(QMainWindow):
         sc.addWidget(QLabel(":"))
         sc.addWidget(self.p2)
         sc.addWidget(self._send_row("Set", lambda: self._run(
-            "set_scores", {"score_p1": self.p1.value(), "score_p2": self.p2.value()})))
+            "set_scores", {"score_p1": self.p1.value(), "score_p2": self.p2.value()}), "set_scores"))
         form.addRow("Scoreboard", self._wrap(sc))
         trow = QHBoxLayout()
         for action in ("start", "pause", "stop"):
             trow.addWidget(self._send_row(action.title(),
-                                          lambda _=False, a=action: self._run("set_timer", {"action": a})))
+                                          lambda _=False, a=action: self._run("set_timer", {"action": a}),
+                                          "set_timer"))
         form.addRow("Timer", self._wrap(trow))
-        form.addRow(self._send_row("Clear all stored content…", self._clear_all))
+        form.addRow(self._send_row("Clear all stored content…", self._clear_all, "clear"))
         return w
 
     def _build_security_tab(self) -> QWidget:
@@ -445,7 +489,76 @@ class MainWindow(QMainWindow):
         sl.addLayout(krow)
         lay.addWidget(sec)
 
+        pw = QGroupBox("Display password (iLEDColor displays)")
+        pl = QVBoxLayout(pw)
+        note = QLabel(
+            "iLEDColor displays can store a 6-character password. Testers found it guards the "
+            "display's settings, but on their units it did <b>not</b> stop new pictures being sent – "
+            "so treat it as a lock against casual tampering. A forgotten password can't be recovered. "
+            "<b>Hold</b> above is what actually keeps others out while this app runs.")
+        note.setWordWrap(True)
+        pl.addWidget(note)
+        prow = QHBoxLayout()
+        self.pw_current = QLineEdit(echoMode=QLineEdit.Password, maxLength=6,
+                                    placeholderText="Current password (if any)")
+        self.pw_new = QLineEdit(echoMode=QLineEdit.Password, maxLength=6, placeholderText="New password")
+        prow.addWidget(self.pw_current)
+        prow.addWidget(self.pw_new)
+        pl.addLayout(prow)
+        brow = QHBoxLayout()
+        self.pw_set_btn = QPushButton("Set / change password")
+        self.pw_set_btn.clicked.connect(self._set_device_password)
+        self.pw_clear_btn = QPushButton("Remove password…")
+        self.pw_clear_btn.clicked.connect(self._clear_device_password)
+        brow.addWidget(self.pw_set_btn)
+        brow.addWidget(self.pw_clear_btn)
+        brow.addStretch()
+        pl.addLayout(brow)
+        lay.addWidget(pw)
+        self.pw_box = pw
         return w
+
+    def _update_password_controls(self, addr: str | None, connected: bool) -> None:
+        if not hasattr(self, "pw_box"):
+            return
+        ok = connected and self.manager.kind(addr) == "iledcolor"
+        self.pw_box.setEnabled(ok)
+
+    def _password_target(self) -> str | None:
+        addr = self.current_address()
+        if not addr or not self.manager.is_connected(addr) or self.manager.kind(addr) != "iledcolor":
+            self.log("Connect to an iLEDColor display first.")
+            return None
+        return addr
+
+    def _set_device_password(self) -> None:
+        addr = self._password_target()
+        new, old = self.pw_new.text(), self.pw_current.text()
+        if not addr:
+            return
+        if len(new) != 6 or not new.isascii():
+            QMessageBox.warning(self, "Password", "The password must be exactly 6 letters or digits.")
+            return
+        info = self.manager.device_info(addr)
+        has_pw = info is not None and info.password_flag != 255
+        mode = 1 if has_pw else 0
+        fut = self.manager.device_password(addr, mode, old if has_pw else "", new)
+        fut.add_done_callback(lambda f, a=addr, n=new: self._events.device.emit(
+            "_password_result", {"address": a, "new": n, "error": None if f.cancelled() or f.exception() is None
+                                 else str(f.exception())}))
+
+    def _clear_device_password(self) -> None:
+        addr = self._password_target()
+        if not addr:
+            return
+        old = self.pw_current.text()
+        if QMessageBox.question(self, "Remove password", "Remove the password from this display?") \
+                != QMessageBox.Yes:
+            return
+        fut = self.manager.device_password(addr, 2, old, "")
+        fut.add_done_callback(lambda f, a=addr: self._events.device.emit(
+            "_password_result", {"address": a, "new": "", "error": None if f.cancelled() or f.exception() is None
+                                 else str(f.exception())}))
 
     @staticmethod
     def _wrap(layout) -> QWidget:
@@ -503,6 +616,10 @@ class MainWindow(QMainWindow):
             tags.append("⟳ rotating")
         if self.settings.find(addr):
             tags.append("saved")
+        if self.manager.kind(addr) == "iledcolor":
+            panel = self.manager._hints.get(addr, {}).get("panel") or {}
+            size = f" {panel['width']}×{panel['height']}" if panel.get("width") else ""
+            tags.insert(0, f"iLEDColor{size}")
         name = it.data(NAME_ROLE) or "LED display"
         it.setText(f"{name}\n{addr}" + (f"\n{'  ·  '.join(tags)}" if tags else ""))
 
@@ -517,22 +634,30 @@ class MainWindow(QMainWindow):
         self.disconnect_btn.setEnabled(connected)
         self.hold_check.setEnabled(bool(addr))
         self.hold_check.setChecked(bool(addr) and self.manager.is_held(addr))
+        caps = self.manager.capabilities(addr) if connected else None
+        supported = lambda cmd: cmd is None or caps is None or cmd in caps  # noqa: E731
         for b in self._action_buttons:
-            b.setEnabled(connected)
+            cmd = b.property("command")
+            b.setEnabled(connected and supported(cmd))
+            b.setToolTip("" if supported(cmd) else "This display doesn't support this")
         uploading = bool(addr) and addr in self._uploading
         self.send_image_btn.setEnabled(connected and not uploading)
         self.send_image_btn.setText("Uploading…" if uploading else "Send image")
-        self.fun_mode.setEnabled(connected)
+        self.fun_mode.setEnabled(connected and supported("set_fun_mode"))
+        self._update_password_controls(addr, connected)
         if hasattr(self, "rotation_tab"):
             self.rotation_tab.update_controls()
         if not addr:
             self.info_label.setText("No display selected")
         elif connected:
             info = self.manager.device_info(addr)
-            self.info_label.setText(
-                f"<b>Connected</b><br>{info.width}×{info.height} (type {info.led_type})<br>"
-                f"Device password: {'none' if info.password_flag == 255 else 'set (flag ' + str(info.password_flag) + ')'}"
-                if info else "<b>Connected</b>")
+            if info is None:
+                self.info_label.setText("<b>Connected</b>")
+            else:
+                family = "iLEDColor" if getattr(info, "kind", "") == "iledcolor" else f"iPixel type {info.led_type}"
+                pw = "none" if info.password_flag == 255 else "set"
+                self.info_label.setText(f"<b>Connected</b><br>{info.width}×{info.height} · {family}<br>"
+                                        f"Device password: {pw}")
         else:
             self.info_label.setText("Not connected")
 
@@ -678,7 +803,11 @@ class MainWindow(QMainWindow):
         if not item:
             return
         addr, name = item.data(ADDR_ROLE), item.data(NAME_ROLE) or ""
-        dev = self.settings.upsert(DeviceEntry(address=addr, name=name, hold=self.manager.is_held(addr)))
+        hint = self.manager._hints.get(addr, {})
+        dev = self.settings.upsert(DeviceEntry(address=addr, name=name, hold=self.manager.is_held(addr),
+                                               kind=hint.get("kind", "ipixel"), panel=hint.get("panel"),
+                                               password=hint.get("password", "")))
+        dev.kind, dev.panel = hint.get("kind", dev.kind), hint.get("panel") or dev.panel
         self.save_settings()
         self._refresh_known_table()
         self.refresh_device_list()
@@ -780,6 +909,18 @@ class MainWindow(QMainWindow):
             self.upload_bar.setVisible(False)
             if data.get("ok"):
                 self.log(f"{label}: uploaded {data['kb']:.0f} KB in {data['seconds']:.0f} s")
+        elif event == "_password_result":
+            if data["error"]:
+                self.log(f"{label}: password change failed – {data['error']}")
+            else:
+                dev = self.settings.find(addr)
+                if dev:
+                    dev.password = data["new"]
+                    self.save_settings()
+                self.pw_current.clear()
+                self.pw_new.clear()
+                self.log(f"{label}: password {'removed' if not data['new'] else 'saved on the display'}"
+                         + ("" if dev else " (save the display under Security so the app remembers it)"))
         elif event == "_upload_done":
             self._uploading.discard(addr)
         elif event == "rotation_stopped" and data.get("message"):

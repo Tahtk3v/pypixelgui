@@ -24,6 +24,11 @@ def default_path() -> Path:
     return config_dir() / "config.json"
 
 
+def media_dir() -> Path:
+    """Copies of images saved as presets."""
+    return config_dir() / "media"
+
+
 def slugify(name: str) -> str:
     """Make a string safe for use as an MQTT topic level."""
     s = re.sub(r"[^a-zA-Z0-9_-]+", "_", name.strip()).strip("_").lower()
@@ -38,6 +43,12 @@ class DeviceEntry:
     alias: str = ""
     #: Keep a connection open on start-up so nobody else can connect.
     hold: bool = False
+    #: "ipixel" (iPixel Color) or "iledcolor".
+    kind: str = "ipixel"
+    #: iLEDColor: geometry/features read from the advertisement.
+    panel: dict | None = None
+    #: iLEDColor: the display's 6-character password, if it has one (stored in plain text).
+    password: str = ""
 
     def __post_init__(self):
         if not self.alias:
@@ -85,7 +96,8 @@ class Settings:
             return cls()
         raw = json.loads(path.read_text(encoding="utf-8"))
         return cls(
-            devices=[DeviceEntry(**d) for d in raw.get("devices", [])],
+            devices=[DeviceEntry(**{k: v for k, v in d.items() if k in DeviceEntry.__dataclass_fields__})
+                     for d in raw.get("devices", [])],
             presets=list(raw.get("presets", [])),
             rotations=list(raw.get("rotations", [])),
             plugins=dict(raw.get("plugins", {})),

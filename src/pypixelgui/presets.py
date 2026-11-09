@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import io
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable
 
 from PIL import Image, ImageDraw
@@ -171,10 +172,30 @@ BUILTIN: list[Preset] = [
 
 
 def user_preset(entry: dict) -> Preset:
-    """Build a preset from a saved ``{"name", "steps": [[command, params], ...]}`` entry."""
+    """Build a preset from a saved ``{"name", "steps": [[command, params], ...]}`` entry.
+
+    Image presets use an ``image_file`` step naming a copy kept in the media folder;
+    the device manager prepares that file for whichever display it is sent to.
+    """
     steps = [(str(c), dict(p)) for c, p in entry.get("steps", [])]
+    image = None
+    if steps and steps[0][0] == "image_file":
+        image = _file_thumbnail(steps[0][1].get("file", ""))
     return Preset(entry["name"], "My presets", entry.get("description", "Saved preset"),
-                  lambda _w, _h: [(c, dict(p)) for c, p in steps], tuple(entry.get("swatch", ())))
+                  lambda _w, _h: [(c, dict(p)) for c, p in steps], tuple(entry.get("swatch", ())),
+                  image=image)
+
+
+def _file_thumbnail(name: str):
+    def draw(w: int, h: int) -> Image.Image:
+        from .config import media_dir
+        from PIL import ImageOps
+        try:
+            with Image.open(media_dir() / Path(name).name) as im:
+                return ImageOps.fit(im.convert("RGB"), (w, h))
+        except OSError:
+            return draw_stripes(w, h, ["444444"])
+    return draw
 
 
 def all_presets(saved: list[dict] | None = None) -> list[Preset]:

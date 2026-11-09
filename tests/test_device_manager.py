@@ -148,3 +148,55 @@ def test_send_image_file_uploads_exact_bytes_with_progress(tmp_path):
     progress = [d for ev, d in events if ev == "upload_progress"]
     assert progress and progress[-1]["sent"] == progress[-1]["total"]
     assert any(ev == "upload_finished" and d["ok"] for ev, d in events)
+
+
+def test_image_preset_and_capabilities_with_iledcolor(tmp_path, monkeypatch):
+    """Saved image preset → prepared → driver upload; unsupported commands are refused."""
+    from PIL import Image
+    from pypixelgui import presets
+    from pypixelgui.drivers.iledcolor import ILedColorClient
+    from pypixelgui.drivers.iledcolor_protocol import PanelInfo
+    monkeypatch.setattr("pypixelgui.config.media_dir", lambda: tmp_path)
+    Image.new("RGB", (100, 40), "blue").save(tmp_path / "abc.png")
+
+    uploads = []
+
+    class Driver(ILedColorClient):
+        async def connect(self):
+            self.is_connected = True
+
+        async def send_prepared(self, prepared, save_slot=0, progress=None):
+            uploads.append(prepared)
+            if progress:
+                progress(1, 1, 10, 10)
+
+    m = DeviceManager(client_factory=lambda a: Driver(a, PanelInfo(48, 12, 1)))
+    try:
+        m.connect("AA").result(2)
+        entry = {"name": "Mine", "steps": [["image_file", {"file": "abc.png"}]]}
+        m.run_preset("AA", presets.user_preset(entry)).result(10)
+        assert uploads and (uploads[0].width, uploads[0].height) == (48, 12)
+        with pytest.raises(RuntimeError, match="doesn't support"):
+            m.run("AA", "set_clock_mode", {"style": 1}).result(2)
+        assert m.capabilities("AA") is not None and "send_text" in m.capabilities("AA")
+    finally:
+        m.shutdown()
+
+
+def test_scan_remembers_kind_and_panel():
+    from pypixelgui.device_manager import FoundDevice, classify
+
+    assert classify("iledcolor-23D4", {21505: bytes.fromhex("424402001000400300000900020094000000")})[0] \
+        == "iledcolor"
+    assert classify("LED_BLE_1", {}) == ("ipixel", None)
+    assert classify("Headphones", {}) is None
+
+    async def scan(_t):
+        return [FoundDevice("iledcolor-1", "BB", kind="iledcolor", panel={"width": 64, "height": 16,
+                                                                          "color_type": 3})]
+    m = DeviceManager(scan_func=scan)
+    try:
+        m.scan(1).result(2)
+        assert m.kind("BB") == "iledcolor"
+    finally:
+        m.shutdown()
