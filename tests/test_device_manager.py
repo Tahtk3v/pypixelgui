@@ -105,3 +105,46 @@ def test_rotation_preload_uses_slots(manager):
     assert calls[0][0] == "send_image_hex" and calls[0][1]["save_slot"] == 3
     assert calls[1] == ("send_text", {**calls[1][1], "save_slot": 4})
     assert calls[2:] == [("show_slot", {"number": 3}), ("show_slot", {"number": 4})]
+
+
+class _SessionClient(FakeClient):
+    """FakeClient whose session runs plans the way pypixelcolor's DeviceSession does."""
+
+    def __init__(self, address):
+        super().__init__(address)
+        session = self._session
+        sent = self.sent_windows = []
+
+        async def execute_command(command_func, *args, **kwargs):
+            import inspect
+            assert "device_info" not in inspect.signature(command_func).parameters
+            plan = command_func(*args, **kwargs)
+            for w in plan.windows:
+                sent.append(w)
+            return type("R", (), {"success": True})()
+        session.execute_command = execute_command
+
+
+def test_send_image_file_uploads_exact_bytes_with_progress(tmp_path):
+    pytest.importorskip("pypixelcolor")
+    from PIL import Image
+    path = tmp_path / "a.gif"
+    frames = [Image.new("RGB", (120, 90), c) for c in ("red", "blue", "green")]
+    frames[0].save(path, save_all=True, append_images=frames[1:], duration=100, loop=0)
+
+    m = DeviceManager(client_factory=_SessionClient)
+    events = []
+    m.add_listener(lambda ev, data: events.append((ev, data)))
+    try:
+        m.connect("AA").result(2)
+        prepared = m.send_image_file("AA", str(path), budget_kb=50).result(10)
+    finally:
+        m.shutdown()
+    client = FakeClient.instances[-1]
+    assert prepared.ext == ".gif" and prepared.width == 32 and prepared.height == 32
+    assert client.sent_windows and client.calls == []  # went through the session, not re-encoded
+    payload = b"".join(w.data for w in client.sent_windows)
+    assert prepared.data[:200] in payload  # our bytes, not a re-encoded copy
+    progress = [d for ev, d in events if ev == "upload_progress"]
+    assert progress and progress[-1]["sent"] == progress[-1]["total"]
+    assert any(ev == "upload_finished" and d["ok"] for ev, d in events)

@@ -13,10 +13,11 @@ from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView, QGridLayout, QInputDialog, QScrollArea, QCheckBox, QColorDialog, QComboBox, QFileDialog, QFormLayout, QGroupBox,
     QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
-    QMessageBox, QPlainTextEdit, QPushButton, QSlider, QSpinBox, QSplitter, QTableWidget,
+    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSlider, QSpinBox, QSplitter, QTableWidget,
     QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
 
+from .. import media
 from .. import presets as presets_mod
 from ..commands import ANIMATIONS
 from ..config import DeviceEntry, Settings, slugify
@@ -77,6 +78,7 @@ class MainWindow(QMainWindow):
         manager.add_listener(lambda ev, data: self._events.device.emit(ev, data))
 
         self._action_buttons: list[QPushButton] = []
+        self._uploading: set[str] = set()
         self._ui_ready = False
         self.setWindowTitle("PyPixel GUI")
         self.resize(1000, 700)
@@ -322,11 +324,22 @@ class MainWindow(QMainWindow):
         form.addRow("Resize", self.resize_combo)
         self.image_slot = self._slot_spin()
         form.addRow("Save to slot", self.image_slot)
+        self.image_budget = QSpinBox(minimum=10, maximum=4000, value=int(media.DEFAULT_BUDGET_KB),
+                                     singleStep=10, suffix=" KB")
+        self.image_budget.setToolTip(
+            "Animations bigger than this get every 2nd/3rd/… frame dropped (keeping the same speed).\n"
+            "Large uploads take minutes over Bluetooth and the display may disconnect or run out of\n"
+            "memory part-way. Raise it if your display copes with more.")
+        form.addRow("Max size", self.image_budget)
         self.preview = QLabel("No image")
         self.preview.setMinimumHeight(140)
         self.preview.setAlignment(Qt.AlignCenter)
         form.addRow("Preview", self.preview)
-        form.addRow(self._send_row("Send image", self._send_image))
+        self.send_image_btn = self._send_row("Send image", self._send_image)
+        form.addRow(self.send_image_btn)
+        self.upload_bar = QProgressBar()
+        self.upload_bar.setVisible(False)
+        form.addRow("", self.upload_bar)
         return w
 
     def _build_clock_tab(self) -> QWidget:
@@ -506,6 +519,9 @@ class MainWindow(QMainWindow):
         self.hold_check.setChecked(bool(addr) and self.manager.is_held(addr))
         for b in self._action_buttons:
             b.setEnabled(connected)
+        uploading = bool(addr) and addr in self._uploading
+        self.send_image_btn.setEnabled(connected and not uploading)
+        self.send_image_btn.setText("Uploading…" if uploading else "Send image")
         self.fun_mode.setEnabled(connected)
         if hasattr(self, "rotation_tab"):
             self.rotation_tab.update_controls()
@@ -592,8 +608,19 @@ class MainWindow(QMainWindow):
         if not path or not Path(path).is_file():
             self.log("Pick an image file first.")
             return
-        self._run("send_image", {"path": path, "resize_method": self.resize_combo.currentText(),
-                                 "save_slot": self.image_slot.value()})
+        addr = self.current_address()
+        if not addr or not self.manager.is_connected(addr):
+            self.log("Connect to a display first.")
+            return
+        if addr in self._uploading:
+            self.log("An image is still uploading to this display – wait for it to finish.")
+            return
+        self._interrupt_rotation(addr)
+        self._uploading.add(addr)
+        self._update_controls()
+        fut = self.manager.send_image_file(addr, path, self.resize_combo.currentText(),
+                                           self.image_slot.value(), self.image_budget.value())
+        fut.add_done_callback(lambda _f, a=addr: self._events.device.emit("_upload_done", {"address": a}))
 
     def _sync_time(self) -> None:
         now = _dt.datetime.now()
@@ -737,6 +764,24 @@ class MainWindow(QMainWindow):
             self.log(f"{label}: {what} ✓")
         elif event == "command_failed":
             self.log(f"{label}: {data['command']} failed — {data['message']}")
+        elif event == "upload_preparing":
+            self.log(f"{label}: preparing {Path(data['name']).name}…")
+        elif event == "upload_prepared":
+            self.log(f"{label}: sending {data['summary']} (file was {data['source_kb']:.0f} KB)")
+            self.upload_bar.setRange(0, 0)  # busy until the first window reports
+            self.upload_bar.setVisible(True)
+        elif event == "upload_progress":
+            if data["total"]:
+                self.upload_bar.setRange(0, data["total"])
+                self.upload_bar.setValue(data["sent"])
+                self.upload_bar.setFormat(f"{data['sent'] / 1024:.0f} / {data['total'] / 1024:.0f} KB  (%p%)")
+            return
+        elif event == "upload_finished":
+            self.upload_bar.setVisible(False)
+            if data.get("ok"):
+                self.log(f"{label}: uploaded {data['kb']:.0f} KB in {data['seconds']:.0f} s")
+        elif event == "_upload_done":
+            self._uploading.discard(addr)
         elif event == "rotation_stopped" and data.get("message"):
             self.log(f"{label}: rotation stopped – {data['message']}")
         if event.startswith("rotation_"):

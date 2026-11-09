@@ -11,7 +11,11 @@ matrix displays, built on [pypixelcolor](https://github.com/lucagoc/pypixelcolor
   looping. Save rotations by name. Optionally loads everything into the display's
   slots first so switching is instant. Sending anything by hand stops the rotation.
 - **Text** – colour, background, animation, speed, rainbow modes, custom fonts, save to slot.
-- **Images & GIFs** with crop/fit and a preview at the display's resolution.
+- **Images & GIFs** with crop/fit and a preview at the display's resolution. Before
+  uploading, animations are shrunk for the display: resized to its exact size, one
+  small shared palette, repeated frames merged, and frames thinned out evenly if the
+  file is over the **Max size** (default 150 KB). Big uploads take minutes over
+  Bluetooth and make displays drop the connection, so a progress bar shows how far along it is.
 - **Clock**, brightness, power, orientation, slots, scoreboard, timer.
 - **Locking displays** – see below.
 - **MQTT** – optional add-on in [`mqtt/`](mqtt/README.md).
@@ -42,6 +46,9 @@ The GUI picks up the add-on automatically and shows an **MQTT** tab.
 
 - **Linux**: needs BlueZ; your user must be allowed to use Bluetooth (usually the `bluetooth` group).
 - **macOS**: the first scan triggers a Bluetooth permission prompt for your terminal/Python.
+  If you use the python.org installer, the app falls back to the `certifi` certificate
+  bundle so emoji in text can still be downloaded (otherwise they fail with
+  `CERTIFICATE_VERIFY_FAILED`).
   macOS hides real Bluetooth addresses, so devices show up as UUIDs – that's normal.
 - **Windows 10/11**: works with the built-in Bluetooth stack.
 

@@ -15,9 +15,11 @@ import asyncio
 import concurrent.futures
 import logging
 import threading
+import time
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Optional
 
+from . import media
 from .commands import to_client_call, validate
 
 #: Commands that can store their content in a device slot.
@@ -26,6 +28,44 @@ SLOT_COMMANDS = frozenset({"send_text", "send_image", "send_image_b64"})
 log = logging.getLogger(__name__)
 
 Listener = Callable[[str, dict], None]
+
+
+class _QuietResize(logging.Filter):
+    """We hand pypixelcolor finished images on purpose; hide its 'skipping resize' warning."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "skipping image resizing" not in record.getMessage()
+
+
+logging.getLogger("pypixelcolor.commands.send_image").addFilter(_QuietResize())
+
+
+class _ProgressWindows(list):
+    """List of transport windows that reports progress as pypixelcolor walks through it."""
+
+    def __init__(self, windows, report: Callable[[int, int, int, int], None]):
+        super().__init__(windows)
+        self._report = report
+
+    def __iter__(self):
+        total_bytes = sum(len(getattr(w, "data", b"")) for w in list.__iter__(self))
+        done = 0
+        n = len(self)
+        for i, w in enumerate(list.__iter__(self)):
+            self._report(i, n, done, total_bytes)
+            yield w
+            done += len(getattr(w, "data", b""))
+        self._report(n, n, total_bytes, total_bytes)
+
+
+def _friendly_upload_error(error: Exception, still_connected: bool) -> str:
+    text = str(error) or type(error).__name__
+    if not still_connected:
+        return (f"the display disconnected during the upload ({text}). Large animations are the usual "
+                "cause – lower “Max size” on the Image tab and try again.")
+    if "no ack" in text or "no_answer" in text:
+        return (f"the display stopped answering ({text}). It may be out of memory for this animation – "
+                "lower “Max size” on the Image tab and try again.")
+    return text
 
 
 @dataclass
@@ -195,6 +235,11 @@ class DeviceManager:
             if not loop:
                 return
 
+    def send_image_file(self, address: str, path: str, resize_method: str = "crop", save_slot: int = 0,
+                        budget_kb: float = media.DEFAULT_BUDGET_KB) -> concurrent.futures.Future:
+        """Shrink an image/GIF for this display (in a worker thread), then upload it with progress events."""
+        return self.submit(self._send_image_file(address, path, resize_method, save_slot, budget_kb))
+
     def set_hold(self, address: str, hold: bool) -> concurrent.futures.Future:
         return self.submit(self._set_hold(address, hold))
 
@@ -280,6 +325,72 @@ class DeviceManager:
         else:
             self._held.discard(address)
         self._emit("hold_changed", address=address, hold=hold)
+
+    async def _send_image_file(self, address: str, path: str, resize_method: str, save_slot: int,
+                               budget_kb: float) -> media.PreparedImage:
+        client = self._require(address, "send_image")
+        info = client.get_device_info()
+        self._emit("upload_preparing", address=address, name=str(path))
+        try:
+            prepared = await asyncio.to_thread(media.prepare, path, info.width, info.height,
+                                               resize_method, budget_kb)
+        except Exception as e:
+            self._emit("command_failed", address=address, command="send_image", message=f"can't read image: {e}")
+            raise
+        self._emit("upload_prepared", address=address, summary=prepared.describe(),
+                   source_kb=prepared.source_bytes / 1024)
+        lock = self._cmd_locks.setdefault(address, asyncio.Lock())
+        async with lock:
+            client = self._require(address, "send_image")
+            started = time.monotonic()
+            try:
+                await self._send_prepared(client, address, prepared, int(save_slot))
+            except Exception as e:
+                self._emit("upload_finished", address=address, ok=False)
+                self._emit("command_failed", address=address, command="send_image",
+                           message=_friendly_upload_error(e, self._is_alive(client)))
+                raise
+        self._emit("upload_finished", address=address, ok=True, seconds=time.monotonic() - started,
+                   kb=prepared.kb)
+        self._emit("command_ok", address=address, command="send_image", params={})
+        return prepared
+
+    async def _send_prepared(self, client: Any, address: str, prepared: media.PreparedImage,
+                             save_slot: int) -> None:
+        """Upload an already display-sized image without pypixelcolor re-encoding it."""
+        hex_data = prepared.data.hex()
+        session = getattr(client, "_session", None)
+        try:
+            from pypixelcolor.commands.send_image import send_image_hex
+        except ImportError:  # pragma: no cover
+            send_image_hex = None
+        if session is None or not hasattr(session, "execute_command") or send_image_hex is None:
+            # Unknown pypixelcolor internals: fall back to the public API (no progress, re-encodes).
+            await client.send_image_hex(hex_string=hex_data, file_extension=prepared.ext, save_slot=save_slot)
+            return
+
+        def report(i: int, n: int, done: int, total: int) -> None:
+            self._emit("upload_progress", address=address, window=i, windows=n, sent=done, total=total)
+
+        # No ``device_info`` parameter here, so the session can't inject it and
+        # pypixelcolor sends our bytes exactly as prepared.
+        def command(hex_string: str, file_extension: str, save_slot: int = 0):
+            plan = send_image_hex(hex_string, file_extension, device_info=None, save_slot=save_slot)
+            plan.windows = _ProgressWindows(list(plan.windows), report)
+            return plan
+
+        result = await session.execute_command(command, hex_string=hex_data, file_extension=prepared.ext,
+                                               save_slot=save_slot)
+        if getattr(result, "success", True) is False:
+            raise RuntimeError(getattr(result, "message", "upload failed"))
+
+    def _require(self, address: str, command: str) -> Any:
+        client = self._clients.get(address)
+        if client is None or not self._is_alive(client):
+            err = RuntimeError(f"{address} is not connected")
+            self._emit("command_failed", address=address, command=command, message=str(err))
+            raise err
+        return client
 
     async def _run_preset(self, address: str, preset, remote: bool, allow_destructive: bool,
                           save_slot: int | None = None) -> None:
