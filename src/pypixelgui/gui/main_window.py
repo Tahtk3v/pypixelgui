@@ -81,6 +81,7 @@ class MainWindow(QMainWindow):
 
         self._action_buttons: list[QPushButton] = []
         self._uploading: set[str] = set()
+        self._icon_fetching: set[str] = set()
         self._ui_ready = False
         self.setWindowTitle("PyPixel GUI")
         self.resize(1000, 700)
@@ -263,10 +264,32 @@ class MainWindow(QMainWindow):
                 self._action_buttons.append(btn)
             self.presets_layout.addWidget(box)
         self.presets_layout.addStretch()
+        self._fetch_missing_icons()
         if hasattr(self, "rotation_tab"):
             self.rotation_tab.refresh_presets()
         if self._ui_ready:
             self._update_controls()
+
+    def _fetch_missing_icons(self) -> None:
+        """Event icons aren't downloaded on the GUI thread; fetch missing ones in the
+        background, then redraw the preset buttons once."""
+        from ..live import events
+        specs = []
+        for e in self.settings.presets:
+            for kind, params in e.get("steps", [])[:1]:
+                spec = (params or {}).get("icon") if kind == "schedule" else None
+                if spec and not events.is_cached(spec) and spec not in self._icon_fetching:
+                    specs.append(spec)
+        if not specs:
+            return
+        self._icon_fetching.update(specs)
+
+        def work():
+            for spec in specs:
+                events.icon(spec)
+        import threading
+        threading.Thread(target=lambda: (work(), self._events.device.emit("_icons_ready", {})),
+                         daemon=True).start()
 
     def _run_preset(self, preset: presets_mod.Preset) -> None:
         addr = self.current_address()
@@ -1027,8 +1050,14 @@ class MainWindow(QMainWindow):
             self.log(f"{label}: {data['command']} failed — {data['message']}")
         elif event == "upload_preparing":
             self.log(f"{label}: preparing {Path(data['name']).name}…")
+        elif event == "_icons_ready":
+            self._populate_presets()
+            return
+        elif event == "resetting":
+            self.log(f"{label}: the last upload was interrupted – reconnecting to reset the display…")
         elif event == "upload_prepared":
-            self.log(f"{label}: sending {data['summary']} (file was {data['source_kb']:.0f} KB)")
+            if not data.get("quiet"):
+                self.log(f"{label}: sending {data['summary']} (file was {data['source_kb']:.0f} KB)")
             self.upload_bar.setRange(0, 0)  # busy until the first window reports
             self.upload_bar.setVisible(True)
         elif event == "upload_progress":
@@ -1039,7 +1068,7 @@ class MainWindow(QMainWindow):
             return
         elif event == "upload_finished":
             self.upload_bar.setVisible(False)
-            if data.get("ok"):
+            if data.get("ok") and not data.get("quiet"):
                 self.log(f"{label}: uploaded {data['kb']:.0f} KB in {data['seconds']:.0f} s")
         elif event == "_password_result":
             if data["error"]:

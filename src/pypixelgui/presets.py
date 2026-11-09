@@ -258,7 +258,7 @@ def _event_thumb(spec: str, fallback):
     """The event's own icon as the preset button picture (cached; no network if cached)."""
     def draw(w: int, h: int) -> Image.Image:
         from .live import events
-        icon = events.icon(spec)
+        icon = events.icon(spec, fetch=False)  # thumbnails are drawn on the GUI thread: cache only
         if icon is None:
             return fallback(w, h)
         im = Image.new("RGB", (w, h))

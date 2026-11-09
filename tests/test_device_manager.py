@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 import pytest
@@ -236,3 +237,70 @@ def test_live_presets_have_sensible_refresh():
     bus = presets.user_preset({"name": "b", "steps": [["transit", {"stop": "x"}]]})
     custom = presets.user_preset({"name": "c", "steps": [["schedule", {"url": "u", "refresh": 300}]]})
     assert (weather.refresh, bus.refresh, custom.refresh) == (600, 60, 300)
+
+
+class _SlowUpload(FakeClient):
+    """An upload that takes a while, like ~100 KB over Bluetooth."""
+    connects = 0
+
+    async def connect(self):
+        _SlowUpload.connects += 1
+        await super().connect()
+
+    async def send_image_hex(self, **kw):
+        self.calls.append(("upload", kw.get("file_extension")))
+        await asyncio.sleep(5)
+
+
+def _gif_b64(size=(32, 32)):
+    import base64
+    import io
+    from PIL import Image
+    frames = [Image.new("RGB", size, c) for c in ("red", "blue")]
+    buf = io.BytesIO()
+    frames[0].save(buf, format="GIF", save_all=True, append_images=frames[1:], duration=100, loop=0)
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+def test_interrupted_upload_resets_the_display_before_the_next_command():
+    import asyncio as _a  # noqa: F401
+    _SlowUpload.connects = 0
+    m = DeviceManager(client_factory=_SlowUpload)
+    events = []
+    m.add_listener(lambda ev, d: events.append(ev))
+    try:
+        m.connect("AA").result(2)
+        from pypixelgui.presets import Preset
+        data = _gif_b64()
+        live = Preset("Schedule", "My", "", lambda w, h: [("send_image_b64", {"data": data, "ext": ".gif"})],
+                      refresh=120)
+        m.show_preset("AA", live)
+        assert _wait(lambda: "upload_prepared" in events)  # upload under way, with progress events
+        m.stop_rotation("AA")                                # user sends something else
+        t = time.monotonic()
+        m.run("AA", "set_brightness", {"level": 20}).result(5)
+        assert time.monotonic() - t < 2                      # no waiting for the old upload
+        assert "resetting" in events and _SlowUpload.connects == 2  # reconnected to reset the display
+        assert FakeClient.instances[-1].calls[-1] == ("set_brightness", {"level": 20})
+    finally:
+        m.shutdown()
+
+
+def test_disconnect_stops_live_updates_and_cannot_hang():
+    class Stuck(FakeClient):
+        async def disconnect(self):
+            await asyncio.sleep(60)  # a display stuck mid-transfer that never answers
+
+    m = DeviceManager(client_factory=Stuck)
+    try:
+        m.connect("AA").result(2)
+        from pypixelgui.presets import Preset
+        live = Preset("x", "My", "", lambda w, h: [("send_text", {"text": "hi"})], refresh=60)
+        m.show_preset("AA", live)
+        assert _wait(lambda: m.rotation_running("AA"))
+        t = time.monotonic()
+        m.disconnect("AA").result(10)
+        assert time.monotonic() - t < 7
+        assert not m.rotation_running("AA") and not m.is_connected("AA")
+    finally:
+        m.shutdown()

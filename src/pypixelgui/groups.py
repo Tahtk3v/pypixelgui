@@ -186,8 +186,10 @@ class GroupClient:
             client = self.manager._require(address, "send_image")
             lock = self.manager._cmd_locks.setdefault(address, asyncio.Lock())
             async with lock:
+                await self.manager._clean_if_dirty(address)
+                client = self.manager._require(address, "send_image")
                 use_slot = slot if slot and self.manager.kind(address) == "ipixel" else 0
-                await self.manager._send_prepared(client, address, tile, use_slot)
+                await self.manager._uploading(address, self.manager._send_prepared(client, address, tile, use_slot))
 
         await asyncio.gather(*(upload(a, t) for a, t in zip(self.spec.members, tiles)))
         if progress:

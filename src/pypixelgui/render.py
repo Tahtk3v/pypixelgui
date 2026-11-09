@@ -216,9 +216,9 @@ def _strip(segments: list[Image.Image], height: int, gap: int) -> Image.Image:
 
 
 def _step_and_ms(distance: int, pps: float) -> tuple[int, int]:
-    step = max(1, -(-distance // MAX_MARQUEE_FRAMES))
-    if step == 1 and pps > 30:
-        step = 2  # fewer frames for the same speed
+    # Two pixels per frame halves the frame count (and the Bluetooth upload)
+    # for the same speed; LED panels still look smooth at these speeds.
+    step = max(2, -(-distance // MAX_MARQUEE_FRAMES))
     return step, max(20, round(step * 1000 / pps))
 
 
