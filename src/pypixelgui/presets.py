@@ -17,6 +17,8 @@ from typing import Callable
 
 from PIL import Image, ImageDraw
 
+from . import render
+
 Step = tuple[str, dict]
 
 
@@ -50,6 +52,26 @@ def _text(text: str, color: str, animation: str, speed: int = 80, bg: str | None
             p["bg_color"] = bg
         return [("send_text", p)]
     return build
+
+
+def _gif_step(frames: list) -> Step:
+    data = render.encode_gif(frames)
+    return ("send_image_b64", {"data": base64.b64encode(data).decode(), "ext": ".gif",
+                               "resize_method": "fit"})
+
+
+def _flash_then_text(text: str, color: str, flash_color: str | None = None,
+                     bg: str = "000000") -> Callable[[int, int], list[Step]]:
+    """Whole panel flashes, then the text shows; the GIF loops on the display."""
+    def build(w: int, h: int) -> list[Step]:
+        frames = render.flash_frames(w, h, flash_color or color, off_color=bg)
+        frames += render.text_frames(text, w, h, color, bg=bg)
+        return [_gif_step(frames)]
+    return build
+
+
+def _rainbow_text(text: str) -> Callable[[int, int], list[Step]]:
+    return lambda w, h: [_gif_step(render.rainbow_text_frames(text, w, h))]
 
 
 # --- flags -------------------------------------------------------------------
@@ -133,15 +155,15 @@ def _flag(draw: Callable[[int, int], Image.Image]) -> Callable[[int, int], list[
 
 
 BUILTIN: list[Preset] = [
-    Preset("CYBER", "Text", "“CYBER” flashing yellow on black",
-           _text("CYBER", "ffff00", "blink", speed=90, bg="000000"), ("ffff00", "000000")),
+    Preset("CYBER", "Text", "All LEDs flash yellow, then “CYBER” in yellow (loops)",
+           _flash_then_text("CYBER", "ffff00"), ("ffff00", "000000")),
     Preset("ALERT", "Text", "Flashing red “ALERT”", _text("ALERT", "ff0000", "blink", speed=95),
            ("ff0000",)),
     Preset("ON AIR", "Text", "Steady red “ON AIR”", _text("ON AIR", "ff2020", "static"), ("ff2020",)),
     Preset("Do not disturb", "Text", "Scrolling amber “DO NOT DISTURB”",
            _text("DO NOT DISTURB", "ffaa00", "scroll_left", speed=70), ("ffaa00",)),
-    Preset("Rainbow welcome", "Text", "Scrolling rainbow “WELCOME”",
-           _text("WELCOME", "ffffff", "scroll_left", speed=70, rainbow=1), tuple(RAINBOW)),
+    Preset("Rainbow welcome", "Text", "“WELCOME” in flowing rainbow colours",
+           _rainbow_text("WELCOME"), tuple(RAINBOW)),
 ] + [
     Preset(f"{name} flag", "Pride", f"{name} pride flag", _flag(draw), swatch, image=draw)
     for name, (draw, swatch) in _FLAGS.items()

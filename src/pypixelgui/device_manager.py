@@ -20,6 +20,9 @@ from typing import Any, Awaitable, Callable, Optional
 
 from .commands import to_client_call, validate
 
+#: Commands that can store their content in a device slot.
+SLOT_COMMANDS = frozenset({"send_text", "send_image", "send_image_b64"})
+
 log = logging.getLogger(__name__)
 
 Listener = Callable[[str, dict], None]
@@ -59,6 +62,7 @@ class DeviceManager:
         self._watchdog_interval = watchdog_interval
         self._clients: dict[str, Any] = {}
         self._held: set[str] = set()
+        self._rotations: dict[str, concurrent.futures.Future] = {}
         self._cmd_locks: dict[str, asyncio.Lock] = {}
         self._listeners: list[Listener] = []
         self._loop = asyncio.new_event_loop()
@@ -123,22 +127,73 @@ class DeviceManager:
     def run_preset(self, address: str, preset, *, remote: bool = False,
                    allow_destructive: bool = True) -> concurrent.futures.Future:
         """Render a :class:`~pypixelgui.presets.Preset` for this display's size and run it."""
-        async def _go():
-            client = self._clients.get(address)
-            if client is None or not self._is_alive(client):
-                err = RuntimeError(f"{address} is not connected")
-                self._emit("command_failed", address=address, command=preset.name, message=str(err))
-                raise err
-            info = client.get_device_info()
-            try:
-                steps = preset.steps(info.width, info.height)
-            except Exception as e:
-                self._emit("command_failed", address=address, command=preset.name, message=str(e))
-                raise
-            for command, params in steps:
-                await self._run(address, command, params, remote, allow_destructive)
-            self._emit("preset_ok", address=address, preset=preset.name)
-        return self.submit(_go())
+        return self.submit(self._run_preset(address, preset, remote, allow_destructive))
+
+    # --- rotation ---------------------------------------------------------
+
+    def start_rotation(self, address: str, items: list[tuple[Any, float]], *, loop: bool = True,
+                       preload_slot: int | None = None, remote: bool = False,
+                       allow_destructive: bool = True) -> concurrent.futures.Future:
+        """Cycle through ``(preset, seconds)`` items on one display.
+
+        Replaces any rotation already running there. With ``preload_slot`` set,
+        each item is first saved to the display's slots ``preload_slot``,
+        ``preload_slot + 1``, … and the rotation then only sends ``show_slot``,
+        which switches instantly instead of re-uploading every time.
+        """
+        if not items:
+            raise ValueError("rotation is empty")
+        self.stop_rotation(address)
+        fut = self.submit(self._rotation(address, list(items), loop, preload_slot, remote, allow_destructive))
+        self._rotations[address] = fut
+        fut.add_done_callback(lambda f, a=address: self._rotation_done(a, f))
+        return fut
+
+    def stop_rotation(self, address: str) -> bool:
+        fut = self._rotations.pop(address, None)
+        if fut is None:
+            return False
+        fut.cancel()
+        return True
+
+    def rotation_running(self, address: str) -> bool:
+        fut = self._rotations.get(address)
+        return fut is not None and not fut.done()
+
+    def _rotation_done(self, address: str, fut: concurrent.futures.Future) -> None:
+        if self._rotations.get(address) is fut:
+            del self._rotations[address]
+        self._emit("rotation_stopped", address=address,
+                   message=None if fut.cancelled() or fut.exception() is None else str(fut.exception()))
+
+    async def _rotation(self, address: str, items: list, loop: bool, preload_slot: int | None,
+                        remote: bool, allow_destructive: bool) -> None:
+        total = len(items)
+        slots: list[int] = []
+        if preload_slot is not None:
+            for i, (preset, _secs) in enumerate(items):
+                slot = preload_slot + i
+                self._emit("rotation_step", address=address, index=i, total=total,
+                           name=f"Loading {preset.name} into slot {slot}")
+                await self._run_preset(address, preset, remote, allow_destructive, save_slot=slot)
+                slots.append(slot)
+        while True:
+            for i, (preset, secs) in enumerate(items):
+                self._emit("rotation_step", address=address, index=i, total=total, name=preset.name)
+                try:
+                    if slots:
+                        await self._run(address, "show_slot", {"number": slots[i]}, remote, allow_destructive)
+                    else:
+                        await self._run_preset(address, preset, remote, allow_destructive)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    # Usually a dropped link; with hold on it comes back, so keep going.
+                    await asyncio.sleep(min(secs, 3))
+                    continue
+                await asyncio.sleep(max(0.5, float(secs)))
+            if not loop:
+                return
 
     def set_hold(self, address: str, hold: bool) -> concurrent.futures.Future:
         return self.submit(self._set_hold(address, hold))
@@ -155,6 +210,9 @@ class DeviceManager:
         return c.get_device_info() if c is not None else None
 
     def shutdown(self, timeout: float = 10.0) -> None:
+        for addr in list(self._rotations):
+            self.stop_rotation(addr)
+
         async def _close():
             self._held.clear()
             self._watchdog_task.cancel()
@@ -222,6 +280,25 @@ class DeviceManager:
         else:
             self._held.discard(address)
         self._emit("hold_changed", address=address, hold=hold)
+
+    async def _run_preset(self, address: str, preset, remote: bool, allow_destructive: bool,
+                          save_slot: int | None = None) -> None:
+        client = self._clients.get(address)
+        if client is None or not self._is_alive(client):
+            err = RuntimeError(f"{address} is not connected")
+            self._emit("command_failed", address=address, command=preset.name, message=str(err))
+            raise err
+        info = client.get_device_info()
+        try:
+            steps = preset.steps(info.width, info.height)
+        except Exception as e:
+            self._emit("command_failed", address=address, command=preset.name, message=str(e))
+            raise
+        for command, params in steps:
+            if save_slot is not None and command in SLOT_COMMANDS:
+                params = {**params, "save_slot": save_slot}
+            await self._run(address, command, params, remote, allow_destructive)
+        self._emit("preset_ok", address=address, preset=preset.name)
 
     async def _run(self, address: str, command: str, params: dict | None,
                    remote: bool, allow_destructive: bool):

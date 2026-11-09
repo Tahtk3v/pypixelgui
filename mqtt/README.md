@@ -34,6 +34,7 @@ pypixelgui-bridge
 |---|---|
 | `<base>/<alias>/set/<command>` | JSON object, or a bare value for the main parameter |
 | `<base>/<alias>/set/preset` | preset name, e.g. `CYBER`, `Trans flag`, or one of your saved presets |
+| `<base>/<alias>/set/rotation` | name of a rotation saved in the GUI, or `stop` |
 | `<base>/<alias>/set/hold` | `ON` / `OFF` |
 | `<base>/<alias>/set/connect`, `.../disconnect` | anything |
 | `<base>/<alias>/status` | `online` / `offline` (retained) |

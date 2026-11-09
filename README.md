@@ -3,9 +3,13 @@
 A cross-platform (Windows / macOS / Linux) desktop app for **iPixel Color** LED
 matrix displays, built on [pypixelcolor](https://github.com/lucagoc/pypixelcolor).
 
-- **Presets** – one-click looks: `CYBER` (flashing yellow), `ALERT`, `ON AIR`,
-  and pride flags (Rainbow, Progress, Trans, Bi, Pan, Lesbian, Non-binary, Ace,
-  Intersex) drawn at your display's exact resolution. Save your own from the Text tab.
+- **Presets** – one-click looks: `CYBER` (whole panel flashes yellow, then the
+  text), `Rainbow welcome` (flowing rainbow text), `ALERT`, `ON AIR`, and pride
+  flags (Rainbow, Progress, Trans, Bi, Pan, Lesbian, Non-binary, Ace, Intersex),
+  all drawn at your display's exact resolution. Save your own from the Text tab.
+- **Rotation** – a playlist of presets, each shown for as many seconds as you like,
+  looping. Save rotations by name. Optionally loads everything into the display's
+  slots first so switching is instant. Sending anything by hand stops the rotation.
 - **Text** – colour, background, animation, speed, rainbow modes, custom fonts, save to slot.
 - **Images & GIFs** with crop/fit and a preview at the display's resolution.
 - **Clock**, brightness, power, orientation, slots, scoreboard, timer.
@@ -73,6 +77,8 @@ src/pypixelgui/
   commands.py        command schema + validation shared by GUI and add-ons
   device_manager.py  BLE connections on a background asyncio loop, hold/reconnect
   presets.py         built-in & saved presets, flag rendering
+  render.py          text effects (flash, rainbow, scrolling) drawn as GIFs
+  rotation.py        saved rotations
   config.py          JSON settings in the per-user config dir
   gui/               PySide6 window
 mqtt/                pypixelgui-mqtt add-on (separate package – can move to its own repo)

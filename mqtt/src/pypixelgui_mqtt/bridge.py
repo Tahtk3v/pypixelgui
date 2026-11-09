@@ -10,6 +10,7 @@ Topics (``<base>`` defaults to ``pypixel``, ``<alias>`` comes from the config):
     <base>/<alias>/set/connect      (any)      connect now
     <base>/<alias>/set/disconnect   (any)
     <base>/<alias>/set/preset       preset name, e.g. "CYBER" or "Trans flag"
+    <base>/<alias>/set/rotation     name of a rotation saved in the GUI; "stop" stops it
     <base>/<alias>/result           JSON {"command", "ok", "error"?}
 
 Examples::
@@ -32,7 +33,7 @@ import ssl
 from dataclasses import asdict, dataclass, fields
 from typing import Any, Callable
 
-from pypixelgui import presets
+from pypixelgui import presets, rotation
 from pypixelgui.commands import COMMANDS, CommandError
 from pypixelgui.config import Settings
 from pypixelgui.device_manager import DeviceManager
@@ -183,14 +184,35 @@ class MqttBridge:
             if command in _CONTROL:
                 fut = self._control(dev.address, command, payload)
             elif command == "preset":
+                self.manager.stop_rotation(dev.address)
                 name = payload.decode("utf-8").strip()
                 preset = presets.find(name, self.settings.presets)
                 if preset is None:
                     raise CommandError(f"unknown preset {name!r}")
                 fut = self.manager.run_preset(dev.address, preset, remote=True,
                                               allow_destructive=self.cfg.allow_destructive)
+            elif command == "rotation":
+                name = payload.decode("utf-8").strip()
+                if name.lower() in ("", "stop", "off"):
+                    self.manager.stop_rotation(dev.address)
+                    self._publish_result(alias, command, None)
+                    return
+                entry = rotation.find(name, self.settings.rotations)
+                if entry is None:
+                    raise CommandError(f"unknown rotation {name!r}")
+                try:
+                    items = rotation.resolve(entry, self.settings.presets)
+                except (KeyError, ValueError) as e:
+                    raise CommandError(str(e)) from None
+                # A rotation runs until stopped, so report that it started rather than wait for it.
+                self.manager.start_rotation(dev.address, items, loop=entry.get("loop", True),
+                                            preload_slot=entry.get("preload_slot"), remote=True,
+                                            allow_destructive=self.cfg.allow_destructive)
+                self._publish_result(alias, command, None)
+                return
             else:
                 params = parse_payload(command, payload)
+                self.manager.stop_rotation(dev.address)  # a direct command takes over the display
                 fut = self.manager.run(dev.address, command, params, remote=True,
                                        allow_destructive=self.cfg.allow_destructive)
         except (CommandError, UnicodeDecodeError) as e:
