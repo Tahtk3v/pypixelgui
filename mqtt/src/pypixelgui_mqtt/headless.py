@@ -35,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     manager = DeviceManager()
     manager.add_listener(lambda ev, data: logging.info("%s %s", ev, data))
     for dev in settings.devices:
+        manager.remember(dev.address, dev.kind, dev.panel, dev.password)
         # Headless mode always holds: the point is to own the displays.
         manager.set_hold(dev.address, True)
 

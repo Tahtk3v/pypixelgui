@@ -16,6 +16,7 @@ import concurrent.futures
 import logging
 import threading
 import time
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Optional
 
@@ -68,16 +69,30 @@ def _friendly_upload_error(error: Exception, still_connected: bool) -> str:
     return text
 
 
+#: Display families.
+KIND_IPIXEL = "ipixel"        # iPixel Color, via pypixelcolor
+KIND_ILEDCOLOR = "iledcolor"  # iLEDColor, via drivers.iledcolor
+
+
 @dataclass
 class FoundDevice:
     name: str
     address: str
     rssi: Optional[int] = None
+    kind: str = KIND_IPIXEL
+    #: iLEDColor panel geometry/features from the advertisement (dict form).
+    panel: Optional[dict] = None
 
 
-def _default_client_factory(address: str):
-    from pypixelcolor import AsyncClient
-    return AsyncClient(address)
+def classify(name: str, manufacturer_data: dict) -> tuple[str, Optional[dict]] | None:
+    """Work out which kind of display an advertisement belongs to (None = not ours)."""
+    from .drivers.iledcolor_protocol import panel_from_manufacturer_data
+    panel = panel_from_manufacturer_data(manufacturer_data or {})
+    if panel is not None:
+        return KIND_ILEDCOLOR, panel.to_dict()
+    if "LED" in (name or ""):  # the filter pypixelcolor uses
+        return KIND_IPIXEL, None
+    return None
 
 
 async def _default_scan(timeout: float) -> list[FoundDevice]:
@@ -86,18 +101,22 @@ async def _default_scan(timeout: float) -> list[FoundDevice]:
     out = []
     for dev, adv in found.values():
         name = dev.name or adv.local_name or ""
-        if "LED" in name:  # same filter pypixelcolor uses
-            out.append(FoundDevice(name=name, address=dev.address, rssi=adv.rssi))
+        kind = classify(name, adv.manufacturer_data)
+        if kind:
+            out.append(FoundDevice(name=name or "LED display", address=dev.address, rssi=adv.rssi,
+                                   kind=kind[0], panel=kind[1]))
     return sorted(out, key=lambda d: -(d.rssi or -999))
 
 
 class DeviceManager:
     """Owns BLE clients; every public method is thread-safe and returns a Future."""
 
-    def __init__(self, client_factory: Callable[[str], Any] = _default_client_factory,
+    def __init__(self, client_factory: Optional[Callable[[str], Any]] = None,
                  scan_func: Callable[[float], Awaitable[list[FoundDevice]]] = _default_scan,
                  watchdog_interval: float = 5.0):
-        self._client_factory = client_factory
+        self._client_factory = client_factory or self._make_client
+        #: What we know about each address before connecting: kind, panel, password.
+        self._hints: dict[str, dict] = {}
         self._scan_func = scan_func
         self._watchdog_interval = watchdog_interval
         self._clients: dict[str, Any] = {}
@@ -137,8 +156,57 @@ class DeviceManager:
     @staticmethod
     def _is_alive(client: Any) -> bool:
         session = getattr(client, "_session", None)
-        alive = getattr(session, "is_connected", None)
-        return bool(alive) if alive is not None else bool(getattr(client, "_connected", True))
+        if session is not None and hasattr(session, "is_connected"):
+            return bool(session.is_connected)
+        alive = getattr(client, "is_connected", None)
+        if isinstance(alive, bool):
+            return alive
+        return bool(getattr(client, "_connected", True))
+
+    # --- device kinds -------------------------------------------------------
+
+    def remember(self, address: str, kind: str = KIND_IPIXEL, panel: Optional[dict] = None,
+                 password: Optional[str] = None) -> None:
+        """Record what kind of display lives at ``address`` (from a scan or saved settings)."""
+        hint = self._hints.setdefault(address, {})
+        hint["kind"] = kind or KIND_IPIXEL
+        if panel:
+            hint["panel"] = panel
+        if password is not None:
+            hint["password"] = password
+
+    def kind(self, address: str) -> str:
+        return self._hints.get(address, {}).get("kind", KIND_IPIXEL)
+
+    def capabilities(self, address: str) -> Optional[frozenset]:
+        """Commands the connected display supports; None means "everything"."""
+        client = self._clients.get(address)
+        return getattr(type(client), "capabilities", None) if client is not None else None
+
+    def _make_client(self, address: str):
+        hint = self._hints.get(address, {})
+        if hint.get("kind") == KIND_ILEDCOLOR:
+            from .drivers.iledcolor import ILedColorClient
+            from .drivers.iledcolor_protocol import PanelInfo
+            panel = PanelInfo.from_dict(hint.get("panel"))
+            if panel is None:
+                raise RuntimeError("panel size unknown – scan once so the app can read it")
+            return ILedColorClient(address, panel, password=hint.get("password", ""))
+        from pypixelcolor import AsyncClient
+        return AsyncClient(address)
+
+    def device_password(self, address: str, mode: int, old: str = "", new: str = "") -> concurrent.futures.Future:
+        """Set (0) / change (1) / clear (2) an iLEDColor display's password."""
+        async def go():
+            client = self._require(address, "password")
+            if not hasattr(type(client), "password_operation"):
+                raise RuntimeError("this display has no password function")
+            lock = self._cmd_locks.setdefault(address, asyncio.Lock())
+            async with lock:
+                await client.password_operation(mode, old, new)
+            self._hints.setdefault(address, {})["password"] = new if mode != 2 else ""
+            self._emit("password_changed", address=address, mode=mode)
+        return self.submit(go())
 
     # --- public API (thread-safe) ----------------------------------------
 
@@ -210,6 +278,9 @@ class DeviceManager:
                         remote: bool, allow_destructive: bool) -> None:
         total = len(items)
         slots: list[int] = []
+        caps = self.capabilities(address)
+        if preload_slot is not None and caps is not None and "show_slot" not in caps:
+            preload_slot = None  # this display has no slots; re-send each item instead
         if preload_slot is not None:
             for i, (preset, _secs) in enumerate(items):
                 slot = preload_slot + i
@@ -279,6 +350,8 @@ class DeviceManager:
         except Exception as e:
             self._emit("error", message=f"Scan failed: {e}")
             raise
+        for d in devices:
+            self.remember(d.address, d.kind, d.panel)
         self._emit("scan_finished", devices=devices)
         return devices
 
@@ -358,6 +431,12 @@ class DeviceManager:
     async def _send_prepared(self, client: Any, address: str, prepared: media.PreparedImage,
                              save_slot: int) -> None:
         """Upload an already display-sized image without pypixelcolor re-encoding it."""
+        def report(i: int, n: int, done: int, total: int) -> None:
+            self._emit("upload_progress", address=address, window=i, windows=n, sent=done, total=total)
+
+        if hasattr(type(client), "send_prepared"):  # our own drivers (iLEDColor)
+            await client.send_prepared(prepared, save_slot=save_slot, progress=report)
+            return
         hex_data = prepared.data.hex()
         session = getattr(client, "_session", None)
         try:
@@ -368,9 +447,6 @@ class DeviceManager:
             # Unknown pypixelcolor internals: fall back to the public API (no progress, re-encodes).
             await client.send_image_hex(hex_string=hex_data, file_extension=prepared.ext, save_slot=save_slot)
             return
-
-        def report(i: int, n: int, done: int, total: int) -> None:
-            self._emit("upload_progress", address=address, window=i, windows=n, sent=done, total=total)
 
         # No ``device_info`` parameter here, so the session can't inject it and
         # pypixelcolor sends our bytes exactly as prepared.
@@ -406,6 +482,12 @@ class DeviceManager:
             self._emit("command_failed", address=address, command=preset.name, message=str(e))
             raise
         for command, params in steps:
+            if command == "image_file":  # saved image preset: a file in our media folder
+                from .config import media_dir
+                await self._send_image_file(address, str(media_dir() / Path(params["file"]).name),
+                                            params.get("resize_method", "crop"), save_slot or 0,
+                                            params.get("budget_kb", media.DEFAULT_BUDGET_KB))
+                continue
             if save_slot is not None and command in SLOT_COMMANDS:
                 params = {**params, "save_slot": save_slot}
             await self._run(address, command, params, remote, allow_destructive)
@@ -419,6 +501,11 @@ class DeviceManager:
         except Exception as e:
             self._emit("command_failed", address=address, command=command, message=str(e))
             raise
+        caps = self.capabilities(address)
+        if caps is not None and command not in caps:
+            err = RuntimeError(f"this display doesn't support {command}")
+            self._emit("command_failed", address=address, command=command, message=str(err))
+            raise err
         lock = self._cmd_locks.setdefault(address, asyncio.Lock())
         async with lock:
             client = self._clients.get(address)

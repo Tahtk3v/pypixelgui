@@ -75,17 +75,22 @@ def _shifted(mask: Image.Image, size: tuple[int, int], x: int, y: int) -> Image.
 
 
 def text_frames(text: str, width: int, height: int, color, bg: str = "000000",
-                hold_ms: int = 2500, scroll_ms: int = 60) -> list[Frame]:
+                hold_ms: int = 2500, scroll_ms: int = 60, scroll: bool | None = None) -> list[Frame]:
     """Text centred if it fits, otherwise one pass scrolling right-to-left.
+
+    ``scroll`` forces scrolling (True) or a still frame (False; long text is
+    then cut off) instead of deciding by width.
 
     ``color`` is a hex string, or a callable ``(frame_index) -> Image`` giving
     a full-size fill image (used for rainbow colouring).
     """
     mask, fits = fit_text(text, width, height)
     fill_for = color if callable(color) else (lambda _i, c=_rgb(color): c)
+    if scroll is not None:
+        fits = not scroll
     if fits:
         frame = Image.new("RGB", (width, height), _rgb(bg))
-        _place(frame, mask, (width - mask.width) // 2, fill_for(0))
+        _place(frame, mask, max(0, (width - mask.width) // 2), fill_for(0))
         return [(frame, hold_ms)]
     distance = width + mask.width
     step = max(1, -(-distance // MAX_SCROLL_FRAMES))
@@ -95,6 +100,12 @@ def text_frames(text: str, width: int, height: int, color, bg: str = "000000",
         _place(frame, mask, x, fill_for(i))
         frames.append((frame, scroll_ms))
     return frames
+
+
+def blink(frames: list[Frame], on_ms: int = 500, off_ms: int = 400, bg: str = "000000") -> list[Frame]:
+    """Alternate the (first) text frame with a blank one."""
+    first = frames[0][0]
+    return [(first, on_ms), (Image.new("RGB", first.size, _rgb(bg)), off_ms)]
 
 
 def flash_frames(width: int, height: int, color: str, times: int = 3, on_ms: int = 150,

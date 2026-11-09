@@ -1,12 +1,20 @@
 # pypixelgui
 
-A cross-platform (Windows / macOS / Linux) desktop app for **iPixel Color** LED
-matrix displays, built on [pypixelcolor](https://github.com/lucagoc/pypixelcolor).
+A cross-platform (Windows / macOS / Linux) desktop app for Bluetooth LED displays:
+
+- **iPixel Color** displays, via [pypixelcolor](https://github.com/lucagoc/pypixelcolor)
+- **iLEDColor** displays (badges, collars, backpacks, signs – names like `iledcolor-…`
+  or `iledeyes-…`), via a built-in driver. Scanning reads each panel's size and colour
+  format from its advertisement. Text, images, GIFs, presets, rotations, brightness,
+  on/off and the display's password work; iPixel-only features (clock, slots,
+  scoreboard, timer, orientation) are greyed out. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+  for the projects the protocol knowledge comes from.
 
 - **Presets** – one-click looks: `CYBER` (whole panel flashes yellow, then the
   text), `Rainbow welcome` (flowing rainbow text), `ALERT`, `ON AIR`, and pride
   flags (Rainbow, Progress, Trans, Bi, Pan, Lesbian, Non-binary, Ace, Intersex),
-  all drawn at your display's exact resolution. Save your own from the Text tab.
+  all drawn at your display's exact resolution. Save your own from the Text or Image
+  tab (**Save as preset…**); they appear at the top of the Presets tab.
 - **Rotation** – a playlist of presets, each shown for as many seconds as you like,
   looping. Save rotations by name. Optionally loads everything into the display's
   slots first so switching is instant. Sending anything by hand stops the rotation.
@@ -69,9 +77,12 @@ anyone nearby with the iPixel app can connect. The app gives you three layers:
    displays (by alias, never by raw address), cannot read local files or fonts,
    and refuses `clear`/`delete` unless you enable it.
 
-**Device-side password:** the display reports a password flag (shown in the
-device info panel), and the official app seems to support a PIN, but that part of
-the protocol isn't implemented in pypixelcolor yet. Once someone captures the
+**Device-side password:** iLEDColor displays can store a 6-character password
+(Security tab). Testers found it protects the display's settings but, on their units,
+did not block new pictures from being sent, and it travels unencrypted – so it's a
+deterrent, not a lock; Hold is what keeps others out. For iPixel displays the
+password flag is shown in the device info panel, but that part of the protocol
+isn't implemented in pypixelcolor yet. Once someone captures the
 BLE packets for setting/entering it (see pypixelcolor's
 [BLE logging guide](https://github.com/lucagoc/pypixelcolor/wiki/Tutorials#getting-ble-logs-from-an-android-device)),
 it can be added as a command there and exposed here – that would be the only
@@ -85,6 +96,8 @@ src/pypixelgui/
   device_manager.py  BLE connections on a background asyncio loop, hold/reconnect
   presets.py         built-in & saved presets, flag rendering
   render.py          text effects (flash, rainbow, scrolling) drawn as GIFs
+  media.py           shrinks images/GIFs for a display before upload
+  drivers/           iLEDColor protocol (pure, tested against published vectors) + BLE client
   rotation.py        saved rotations
   config.py          JSON settings in the per-user config dir
   gui/               PySide6 window
