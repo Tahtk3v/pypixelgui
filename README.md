@@ -46,6 +46,10 @@ A cross-platform (Windows / macOS / Linux) desktop app for Bluetooth LED display
 - **MQTT / Home Assistant** – optional add-on in [`mqtt/`](mqtt/README.md): displays and
   groups appear in Home Assistant automatically (light with presets as effects, message
   box, preset/rotation selects), with zigbee2mqtt-style JSON topics for everything else.
+  Runs on a Raspberry Pi near the displays without the GUI – see
+  [mqtt/docs/sbc.md](mqtt/docs/sbc.md).
+- **Live presets stay current** – while a weather, departure or schedule preset is shown
+  it re-checks every few minutes and updates the display only when something changed.
 
 ## Install & run
 

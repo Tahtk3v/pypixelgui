@@ -24,3 +24,17 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon0 libdbus-1-3
       - run: pip install -e ".[dev]" -e ./mqtt
       - run: pytest -v tests mqtt/tests
+
+  bridge-without-gui:
+    # The headless bridge (Raspberry Pi, Docker) must work without Qt installed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r mqtt/requirements-bridge.txt pytest
+      - run: pip install --no-deps . ./mqtt
+      - run: python -c "import importlib.util, sys; sys.exit(importlib.util.find_spec('PySide6') is not None)"
+      - run: pypixelgui-bridge --help
+      - run: pytest -v mqtt/tests

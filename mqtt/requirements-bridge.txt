@@ -1,0 +1,7 @@
+# Everything the headless bridge needs, without the desktop GUI (Qt).
+# Install these, then pypixelgui and pypixelgui-mqtt with --no-deps (see docs/sbc.md).
+pypixelcolor>=0.5.0
+Pillow
+certifi
+truststore>=0.9
+paho-mqtt>=2.0

@@ -33,6 +33,9 @@ class Preset:
     swatch: tuple[str, ...] = ()
     #: Draws the preset's picture (flags) – used for the GUI thumbnail.
     image: Callable[[int, int], Image.Image] | None = field(default=None, repr=False)
+    #: Live presets (weather, departures, schedules): re-check every this many
+    #: seconds while shown and update the display when the content changed. 0 = static.
+    refresh: float = 0
 
     def steps(self, width: int, height: int) -> list[Step]:
         return self.build(width, height)
@@ -188,7 +191,7 @@ def user_preset(entry: dict) -> Preset:
             thumb = _event_thumb(params["icon"], thumb)
         return Preset(entry["name"], "My presets", entry.get("description", "Live"),
                       lambda w, h: [live_step(kind, params, w, h)], tuple(entry.get("swatch", ())),
-                      image=thumb)
+                      image=thumb, refresh=float(params.get("refresh") or LIVE_REFRESH[kind]))
     return Preset(entry["name"], "My presets", entry.get("description", "Saved preset"),
                   lambda _w, _h: [(c, dict(p)) for c, p in steps], tuple(entry.get("swatch", ())),
                   image=image)
@@ -246,13 +249,16 @@ def _schedule_thumb(w: int, h: int) -> Image.Image:
 
 
 LIVE_KINDS = {"weather": _weather_thumb, "transit": _transit_thumb, "schedule": _schedule_thumb}
+#: How often a shown live preset is re-checked by default (seconds). Departures
+#: count down per minute; schedules change per talk; weather updates slowly.
+LIVE_REFRESH = {"weather": 600, "transit": 60, "schedule": 120}
 
 
 def _event_thumb(spec: str, fallback):
     """The event's own icon as the preset button picture (cached; no network if cached)."""
     def draw(w: int, h: int) -> Image.Image:
         from .live import events
-        icon = events.icon(spec)
+        icon = events.icon(spec, fetch=False)  # thumbnails are drawn on the GUI thread: cache only
         if icon is None:
             return fallback(w, h)
         im = Image.new("RGB", (w, h))

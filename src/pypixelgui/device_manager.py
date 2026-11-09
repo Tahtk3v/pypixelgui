@@ -25,6 +25,14 @@ from .commands import to_client_call, validate
 
 #: Commands that can store their content in a device slot.
 SLOT_COMMANDS = frozenset({"send_text", "send_image", "send_image_b64"})
+#: Commands that change what the display shows.
+CONTENT_COMMANDS = SLOT_COMMANDS | {"show_slot", "clear", "delete", "set_clock_mode"}
+
+
+def _digest(steps) -> str:
+    import hashlib
+    import json
+    return hashlib.sha1(json.dumps(steps, sort_keys=True, default=str).encode()).hexdigest()
 
 log = logging.getLogger(__name__)
 
@@ -124,6 +132,10 @@ class DeviceManager:
         self._held: set[str] = set()
         self._rotations: dict[str, concurrent.futures.Future] = {}
         self._rotation_names: dict[str, str] = {}
+        #: Fingerprint of the preset content each display shows (to skip re-uploads).
+        self._shown: dict[str, str] = {}
+        #: Displays whose last upload was interrupted – reset before the next command.
+        self._dirty: set[str] = set()
         self._cmd_locks: dict[str, asyncio.Lock] = {}
         self._listeners: list[Listener] = []
         self._loop = asyncio.new_event_loop()
@@ -273,6 +285,19 @@ class DeviceManager:
             return await self._run_preset(address, preset, remote, allow_destructive)
         return self.submit(go())
 
+    def show_preset(self, address: str, preset, *, remote: bool = False, allow_destructive: bool = True,
+                    connect: bool = False) -> concurrent.futures.Future:
+        """Show a preset. Live presets (``preset.refresh > 0``) then keep themselves
+        up to date: re-checked every ``refresh`` seconds and re-uploaded only when
+        what they'd show has changed. Anything sent afterwards stops that, just
+        like a rotation (it *is* a one-item rotation)."""
+        if getattr(preset, "refresh", 0) > 0:
+            return self.start_rotation(address, [(preset, preset.refresh)], loop=True, remote=remote,
+                                       allow_destructive=allow_destructive, connect=connect,
+                                       skip_unchanged=True)
+        return self.run_preset(address, preset, remote=remote, allow_destructive=allow_destructive,
+                               connect=connect)
+
     async def _ensure_connected(self, address: str) -> None:
         if not self.is_connected(address):
             await self._connect(address)
@@ -282,7 +307,7 @@ class DeviceManager:
     def start_rotation(self, address: str, items: list[tuple[Any, float]], *, loop: bool = True,
                        preload_slot: int | None = None, remote: bool = False,
                        allow_destructive: bool = True, connect: bool = False,
-                       name: str = "") -> concurrent.futures.Future:
+                       name: str = "", skip_unchanged: bool = False) -> concurrent.futures.Future:
         """Cycle through ``(preset, seconds)`` items on one display.
 
         Replaces any rotation already running there. With ``preload_slot`` set,
@@ -297,7 +322,8 @@ class DeviceManager:
         async def go():
             if connect:
                 await self._ensure_connected(address)
-            await self._rotation(address, list(items), loop, preload_slot, remote, allow_destructive)
+            await self._rotation(address, list(items), loop, preload_slot, remote, allow_destructive,
+                                 skip_unchanged)
         fut = self.submit(go())
         self._rotations[address] = fut
         self._rotation_names[address] = name
@@ -326,7 +352,7 @@ class DeviceManager:
                    message=None if fut.cancelled() or fut.exception() is None else str(fut.exception()))
 
     async def _rotation(self, address: str, items: list, loop: bool, preload_slot: int | None,
-                        remote: bool, allow_destructive: bool) -> None:
+                        remote: bool, allow_destructive: bool, skip_unchanged: bool = False) -> None:
         total = len(items)
         slots: list[int] = []
         caps = self.capabilities(address)
@@ -346,7 +372,8 @@ class DeviceManager:
                     if slots:
                         await self._run(address, "show_slot", {"number": slots[i]}, remote, allow_destructive)
                     else:
-                        await self._run_preset(address, preset, remote, allow_destructive)
+                        await self._run_preset(address, preset, remote, allow_destructive,
+                                               skip_unchanged=skip_unchanged)
                 except asyncio.CancelledError:
                     raise
                 except Exception:
@@ -429,17 +456,47 @@ class DeviceManager:
 
     async def _disconnect(self, address: str) -> None:
         self._held.discard(address)
+        self.stop_rotation(address)  # live updates / rotations stop with the connection
+        self._dirty.discard(address)
+        self._shown.pop(address, None)
         client = self._clients.pop(address, None)
         if client is not None:
             await self._safe_disconnect(client)
             self._emit("disconnected", address=address, expected=True)
 
     @staticmethod
-    async def _safe_disconnect(client: Any) -> None:
+    async def _safe_disconnect(client: Any, timeout: float = 5.0) -> None:
+        """Disconnect, but never hang: a display stuck mid-transfer may not answer."""
         try:
-            await client.disconnect()
+            await asyncio.wait_for(client.disconnect(), timeout)
         except Exception:
-            log.debug("disconnect raised", exc_info=True)
+            log.debug("disconnect raised or timed out", exc_info=True)
+
+    async def _clean_if_dirty(self, address: str) -> None:
+        """If an upload to this display was cut off, it may still be waiting for the
+        rest and would ignore new commands. Reconnecting resets it. Call while
+        holding the display's lock."""
+        if address not in self._dirty:
+            return
+        self._dirty.discard(address)
+        old = self._clients.get(address)
+        if old is None:
+            return
+        self._emit("resetting", address=address)
+        await self._safe_disconnect(old)
+        client = self._client_factory(address)
+        await client.connect()
+        self._clients[address] = client
+        self._emit("reconnected", address=address)
+
+    async def _uploading(self, address: str, coro):
+        """Await an upload; if it gets cancelled half-way, mark the display for a reset."""
+        try:
+            return await coro
+        except asyncio.CancelledError:
+            self._dirty.add(address)
+            self._shown.pop(address, None)
+            raise
 
     async def _set_hold(self, address: str, hold: bool) -> None:
         if hold:
@@ -456,6 +513,7 @@ class DeviceManager:
         info = client.get_device_info()
         self._emit("upload_preparing", address=address, name=str(path))
         budget_kb *= getattr(info, "panels", 1)  # a group gets a budget per panel
+        self._shown.pop(address, None)
         try:
             prepared = await asyncio.to_thread(media.prepare, path, info.width, info.height,
                                                resize_method, budget_kb)
@@ -469,7 +527,9 @@ class DeviceManager:
             client = self._require(address, "send_image")
             started = time.monotonic()
             try:
-                await self._send_prepared(client, address, prepared, int(save_slot))
+                await self._clean_if_dirty(address)
+                client = self._require(address, "send_image")
+                await self._uploading(address, self._send_prepared(client, address, prepared, int(save_slot)))
             except Exception as e:
                 self._emit("upload_finished", address=address, ok=False)
                 self._emit("command_failed", address=address, command="send_image",
@@ -521,7 +581,7 @@ class DeviceManager:
         return client
 
     async def _run_preset(self, address: str, preset, remote: bool, allow_destructive: bool,
-                          save_slot: int | None = None) -> None:
+                          save_slot: int | None = None, skip_unchanged: bool = False) -> None:
         client = self._clients.get(address)
         if client is None or not self._is_alive(client):
             err = RuntimeError(f"{address} is not connected")
@@ -531,9 +591,13 @@ class DeviceManager:
         try:
             # May draw animations or fetch live data – keep it off the Bluetooth loop.
             steps = await asyncio.to_thread(preset.steps, info.width, info.height)
+            digest = _digest(steps)
         except Exception as e:
             self._emit("command_failed", address=address, command=preset.name, message=str(e))
             raise
+        if skip_unchanged and self._shown.get(address) == digest:
+            self._emit("live_unchanged", address=address, preset=preset.name)
+            return
         for command, params in steps:
             if command == "image_file":  # saved image preset: a file in our media folder
                 from .config import media_dir
@@ -544,21 +608,28 @@ class DeviceManager:
             if save_slot is not None and command in SLOT_COMMANDS:
                 params = {**params, "save_slot": save_slot}
             await self._run(address, command, params, remote, allow_destructive)
+        self._shown[address] = digest
         self._emit("preset_ok", address=address, preset=preset.name)
 
     async def _run(self, address: str, command: str, params: dict | None,
                    remote: bool, allow_destructive: bool):
         try:
-            kwargs = validate(command, params, remote=remote, allow_destructive=allow_destructive)
-            method, kwargs = to_client_call(command, kwargs)
+            validated = validate(command, params, remote=remote, allow_destructive=allow_destructive)
+            method, kwargs = to_client_call(command, dict(validated))
         except Exception as e:
             self._emit("command_failed", address=address, command=command, message=str(e))
             raise
+        if command in CONTENT_COMMANDS:
+            self._shown.pop(address, None)  # the display now shows something else
         caps = self.capabilities(address)
         if caps is not None and command not in caps:
             err = RuntimeError(f"this display doesn't support {command}")
             self._emit("command_failed", address=address, command=command, message=str(err))
             raise err
+        prepared = None
+        if command == "send_image_b64":
+            # Already display-sized (presets, live data)? Upload as-is, with progress.
+            prepared = await asyncio.to_thread(self._as_prepared, address, validated)
         lock = self._cmd_locks.setdefault(address, asyncio.Lock())
         async with lock:
             client = self._clients.get(address)
@@ -567,12 +638,50 @@ class DeviceManager:
                 self._emit("command_failed", address=address, command=command, message=str(err))
                 raise err
             try:
-                result = await getattr(client, method)(**kwargs)
+                await self._clean_if_dirty(address)
+                client = self._clients.get(address)
+                if prepared is not None:
+                    self._emit("upload_prepared", address=address, summary=prepared.describe(),
+                               source_kb=prepared.kb, quiet=self.rotation_running(address))
+                    started = time.monotonic()
+                    await self._uploading(address, self._send_prepared(client, address, prepared,
+                                                                       int(validated.get("save_slot", 0))))
+                    self._emit("upload_finished", address=address, ok=True,
+                               seconds=time.monotonic() - started, kb=prepared.kb,
+                               quiet=self.rotation_running(address))
+                    result = None
+                elif command in CONTENT_COMMANDS:
+                    result = await self._uploading(address, getattr(client, method)(**kwargs))
+                else:
+                    result = await getattr(client, method)(**kwargs)
             except Exception as e:
-                self._emit("command_failed", address=address, command=command, message=str(e))
+                if prepared is not None:
+                    self._emit("upload_finished", address=address, ok=False)
+                self._emit("command_failed", address=address, command=command,
+                           message=_friendly_upload_error(e, self._is_alive(client)) if prepared else str(e))
                 raise
         self._emit("command_ok", address=address, command=command, params=kwargs if method == command else {})
         return result
+
+    def _as_prepared(self, address: str, kwargs: dict):
+        """The image as a ready-to-send PreparedImage if it already fits this display
+        exactly (no re-encoding needed); otherwise None and the normal path is used."""
+        import base64
+        import io as _io
+        from PIL import Image
+        info = self.device_info(address)
+        if info is None:
+            return None
+        try:
+            raw = base64.b64decode(kwargs["data"], validate=True)
+            with Image.open(_io.BytesIO(raw)) as im:
+                size, frames = im.size, getattr(im, "n_frames", 1)
+        except Exception:
+            return None
+        if size != (info.width, info.height):
+            return None
+        ext = ".gif" if frames > 1 or kwargs.get("ext") == ".gif" else ".png"
+        return media.PreparedImage(raw, ext, size[0], size[1], frames, frames, len(raw))
 
     async def _watchdog(self) -> None:
         """Notice dropped links and reconnect held devices."""

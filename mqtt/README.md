@@ -19,11 +19,13 @@ pip install ./mqtt
 ```
 
 - **With the GUI**: an **MQTT** tab appears. Enter the broker details and press *Save & start*.
-- **Headless** (e.g. a Raspberry Pi next to the display): set things up once in the GUI,
-  then run the bridge, which also *holds* every saved display so nobody else can connect:
+- **Headless** on a Raspberry Pi or other small Linux box near the displays, like
+  zigbee2mqtt: set it up from a terminal (`pypixelgui-bridge scan`, `add`, `mqtt`) and run
+  it as a service or in Docker. Step-by-step: **[docs/sbc.md](docs/sbc.md)** (also explains
+  where ESP32s fit in). Saved displays are *held* so nobody else can connect.
 
 ```bash
-pypixelgui-bridge
+pypixelgui-bridge scan
 ```
 
 ## Home Assistant

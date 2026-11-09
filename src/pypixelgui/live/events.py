@@ -199,16 +199,30 @@ def find_icon_url(spec: str) -> str | None:
     return None
 
 
-def icon(spec: str) -> Image.Image | None:
-    """The event's icon (cached on disk), or None if there isn't one."""
+NEGATIVE_CACHE_SECONDS = 86400
+
+
+def icon(spec: str, fetch: bool = True) -> Image.Image | None:
+    """The event's icon, from the disk cache; with ``fetch`` (default) it's looked up
+    online when not cached. Lookups that found nothing are remembered for a day,
+    so a missing icon doesn't cause a network round-trip every time.
+
+    Never call with ``fetch=True`` from the GUI thread – it can take seconds."""
     if not spec:
         return None
-    path = _icon_cache() / (hashlib.sha1(spec.encode()).hexdigest()[:16] + ".png")
+    key = hashlib.sha1(spec.encode()).hexdigest()[:16]
+    path = _icon_cache() / f"{key}.png"
+    missing = _icon_cache() / f"{key}.none"
     if path.exists():
         try:
             return Image.open(path).convert("RGBA")
         except OSError:
             pass
+    if not fetch:
+        return None
+    import time
+    if missing.exists() and time.time() - missing.stat().st_mtime < NEGATIVE_CACHE_SECONDS:
+        return None
     im = None
     try:
         for url in icon_candidates(spec):
@@ -218,10 +232,17 @@ def icon(spec: str) -> Image.Image | None:
             except (FetchError, OSError, ValueError, ImportError):
                 continue
     except (FetchError, OSError, ValueError):
-        return None
+        im = None
+    path.parent.mkdir(parents=True, exist_ok=True)
     if im is None:
+        missing.touch()
         return None
     im.thumbnail((64, 64), Image.LANCZOS)
-    path.parent.mkdir(parents=True, exist_ok=True)
     im.save(path)
+    missing.unlink(missing_ok=True)
     return im
+
+
+def is_cached(spec: str) -> bool:
+    key = hashlib.sha1(spec.encode()).hexdigest()[:16]
+    return (_icon_cache() / f"{key}.png").exists() or (_icon_cache() / f"{key}.none").exists()

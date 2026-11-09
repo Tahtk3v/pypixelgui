@@ -58,7 +58,7 @@ def test_schedule_draws_on_every_panel(size):
 
 def test_schedule_preset_uses_event_icon(monkeypatch):
     monkeypatch.setattr(schedule, "get_bytes", lambda *a, **k: (DATA / "frab_eth0_2026.xml").read_bytes())
-    monkeypatch.setattr(events, "icon", lambda spec: Image.new("RGBA", (32, 32), (0, 255, 255, 255)))
+    monkeypatch.setattr(events, "icon", lambda spec, fetch=True: Image.new("RGBA", (32, 32), (0, 255, 255, 255)))
     entry = {"name": "eth0", "steps": [["schedule", {"url": "https://x/schedule.xml", "icon": "eth0wiki:eth0_2026"}]]}
     p = presets.user_preset(entry)
     assert p.thumbnail().getpixel((24, 14)) == (0, 255, 255)  # button shows the event icon
@@ -144,3 +144,20 @@ def test_icon_loader_skips_broken_links_and_renders_svg(monkeypatch, tmp_path):
     monkeypatch.setattr(events, "_icon_cache", lambda: tmp_path)
     im = events.icon("ccc:congress/2026")
     assert im is not None and im.getpixel((im.width // 2, im.height // 2))[:3] == (0x75, 0xB4, 0x4B)
+
+
+def test_thumbnails_never_touch_the_network(monkeypatch, tmp_path):
+    """Preset buttons are drawn on the GUI thread – a missing icon must not be downloaded there."""
+    monkeypatch.setattr(events, "_icon_cache", lambda: tmp_path)
+    monkeypatch.setattr(events, "icon_candidates", lambda spec: pytest.fail("network used on GUI thread"))
+    p = presets.user_preset({"name": "x", "steps": [["schedule", {"url": "u", "icon": "ccc:camp/2027"}]]})
+    assert p.thumbnail().size == (48, 28)
+
+
+def test_failed_icon_lookup_is_remembered(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(events, "_icon_cache", lambda: tmp_path)
+    monkeypatch.setattr(events, "icon_candidates", lambda spec: calls.append(spec) or [])
+    assert events.icon("ccc:camp/2027") is None and events.is_cached("ccc:camp/2027")
+    assert events.icon("ccc:camp/2027") is None
+    assert len(calls) == 1  # not retried on every redraw
