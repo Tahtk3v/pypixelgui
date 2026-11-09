@@ -50,11 +50,14 @@ class GroupDialog(QDialog):
 
         sync = QHBoxLayout()
         self.sync = QCheckBox("iPixel displays: start animations together using slot")
-        self.sync.setToolTip("Saves each part to this slot, then shows it on every display at once.\n"
-                             "Without it, each display starts when its own upload finishes.\n"
+        self.sync.setToolTip("Saves each part to this slot, then shows it on every display at once – and\n"
+                             "again every time the animation loops, so the displays don't drift apart.\n"
+                             "Without it, each iPixel display runs on its own clock.\n"
+                             "Pick a slot you don't use for anything else.\n"
                              "iLEDColor displays are synchronised automatically.")
         self.sync_slot = QSpinBox(minimum=1, maximum=255, value=existing.sync_slot or 9 if existing else 9)
-        self.sync.setChecked(bool(existing and existing.sync_slot))
+        # New groups sync by default; scrolling text across panels needs it.
+        self.sync.setChecked(bool(existing.sync_slot) if existing else True)
         sync.addWidget(self.sync)
         sync.addWidget(self.sync_slot)
         sync.addStretch()

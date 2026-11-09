@@ -69,6 +69,8 @@ class Settings:
     plugins: dict[str, dict] = field(default_factory=dict)
     #: Only connect to devices listed in `devices` (scan results are still shown).
     known_devices_only: bool = False
+    #: Appearance: "system", "light" or "dark".
+    theme: str = "system"
 
     def find(self, address: str) -> DeviceEntry | None:
         return next((d for d in self.devices if d.address.lower() == address.lower()), None)
@@ -111,6 +113,7 @@ class Settings:
             groups=list(raw.get("groups", [])),
             plugins=dict(raw.get("plugins", {})),
             known_devices_only=bool(raw.get("known_devices_only", False)),
+            theme=str(raw.get("theme", "system")),
         )
 
     def save(self, path: Path | None = None) -> Path:

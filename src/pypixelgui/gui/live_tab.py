@@ -108,8 +108,10 @@ class LiveTab(QWidget):
         self.lang = QComboBox()
         self.lang.addItems(["nl", "en"])
         self.show_place = QLineEdit(placeholderText="Label (optional)")
+        self.w_speed = self._speed_combo()
         opts.addWidget(self.days)
         opts.addWidget(self.lang)
+        opts.addWidget(self.w_speed)
         opts.addWidget(self.show_place)
         form.addRow("Show", self._wrap(opts))
         form.addRow(self._wrap(self._actions(self._weather_entry)))
@@ -151,7 +153,8 @@ class LiveTab(QWidget):
         return {"name": f"Weer {place.name}", "description": f"Weather for {place.label()}",
                 "steps": [["weather", {"latitude": place.latitude, "longitude": place.longitude,
                                        "label": label, "forecast_days": self.days.value(),
-                                       "lang": self.lang.currentText()}]]}
+                                       "lang": self.lang.currentText(),
+                                       "speed": self.w_speed.currentData()}]]}
 
     # --- transit -----------------------------------------------------------------------
 
@@ -173,8 +176,10 @@ class LiveTab(QWidget):
         self.lines = QLineEdit(placeholderText="Only lines (e.g. 12, 28) – empty = all")
         self.count = QSpinBox(minimum=1, maximum=8, value=3, suffix=" departures")
         self.stop_label = QLineEdit(placeholderText="Label (optional)")
+        self.t_speed = self._speed_combo()
         opts.addWidget(self.lines)
         opts.addWidget(self.count)
+        opts.addWidget(self.t_speed)
         opts.addWidget(self.stop_label)
         form.addRow("Show", self._wrap(opts))
         form.addRow(self._wrap(self._actions(self._transit_entry)))
@@ -215,7 +220,17 @@ class LiveTab(QWidget):
         lines = [x.strip() for x in self.lines.text().replace(";", ",").split(",") if x.strip()]
         return {"name": f"Vertrek {stop.name}", "description": f"Departures from {stop.label()}",
                 "steps": [["transit", {"stop": stop.code, "label": self.stop_label.text().strip(),
-                                       "lines": lines, "count": self.count.value()}]]}
+                                       "lines": lines, "count": self.count.value(),
+                                       "speed": self.t_speed.currentData()}]]}
+
+    @staticmethod
+    def _speed_combo() -> QComboBox:
+        combo = QComboBox()
+        combo.setToolTip("How fast text scrolls when it doesn't fit the display")
+        for label, key in (("Slow scroll", "slow"), ("Normal scroll", "normal"), ("Fast scroll", "fast")):
+            combo.addItem(label, key)
+        combo.setCurrentIndex(0)  # slow reads best on small panels
+        return combo
 
     @staticmethod
     def _wrap(layout) -> QWidget:

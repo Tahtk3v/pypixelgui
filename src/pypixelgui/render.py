@@ -179,9 +179,19 @@ def badge(text: str, fg: str, bg: str, height: int, size: int | None = None, pad
     return seg
 
 
+#: Default scroll speed for live data, in pixels per second (readable on 16-pixel panels).
+SCROLL_SPEEDS = {"slow": 16, "normal": 24, "fast": 40}
+MAX_MARQUEE_FRAMES = 600
+
+
 def marquee(segments: list[Image.Image], width: int, height: int, gap: int = 4, hold_ms: int = 4000,
-            step_ms: int = 50) -> list[Frame]:
-    """Join segments left to right; show still if it fits, otherwise scroll it through once."""
+            speed: float = SCROLL_SPEEDS["normal"]) -> list[Frame]:
+    """Join segments left to right; show still if it fits, otherwise scroll it through once.
+
+    ``speed`` is in pixels per second. The step per frame grows only when the
+    text is so long that it would need more than MAX_MARQUEE_FRAMES frames; the
+    frame time grows with it, so the speed stays the same.
+    """
     total = sum(s.width for s in segments) + gap * max(0, len(segments) - 1)
     strip = Image.new("RGB", (max(1, total), height))
     x = 0
@@ -193,10 +203,13 @@ def marquee(segments: list[Image.Image], width: int, height: int, gap: int = 4, 
         frame.paste(strip, ((width - total) // 2, 0))
         return [(frame, hold_ms)]
     distance = width + total
-    step = max(1, -(-distance // (MAX_SCROLL_FRAMES * 2)))
+    step = max(1, -(-distance // MAX_MARQUEE_FRAMES))
+    if step == 1 and speed > 25:
+        step = 2  # fewer frames for the same speed
+    frame_ms = max(20, round(step * 1000 / max(1.0, float(speed))))
     out = []
     for x in range(width, -total - 1, -step):
         frame = Image.new("RGB", (width, height))
         frame.paste(strip, (x, 0))
-        out.append((frame, step_ms))
+        out.append((frame, frame_ms))
     return out

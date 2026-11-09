@@ -6,8 +6,9 @@ panels at once; brightness and power go to every panel. Because it behaves
 like a device, presets, rotations and MQTT work on groups unchanged.
 
 Animations: each panel starts playing when its own upload finishes, so after
-all uploads are done the group restarts them together where the hardware
-allows it:
+all uploads are done the group restarts them together – and again at the start
+of every loop of the animation, because two displays' clocks drift apart over
+a long scroll. Restarting uses:
 
 * iLEDColor – re-announcing the just-uploaded program makes the panel show it
   again from the start (it answers "already stored", nothing is re-sent);
@@ -95,6 +96,7 @@ class GroupClient:
         self.manager = manager
         self.spec = spec
         self._info: GroupInfo | None = None
+        self._resync: asyncio.Task | None = None
 
     # --- connection ---------------------------------------------------------------
 
@@ -112,7 +114,21 @@ class GroupClient:
 
     async def disconnect(self) -> None:
         # Members stay connected: they may be held, or used on their own.
+        self._stop_resync()
         self._info = None
+
+    def _stop_resync(self) -> None:
+        if self._resync is not None:
+            self._resync.cancel()
+            self._resync = None
+
+    def can_sync(self) -> bool:
+        """True when every panel can be restarted on command."""
+        for address in self.spec.members:
+            client = self.manager._clients.get(address)
+            if not hasattr(type(client), "replay_last") and not self.spec.sync_slot:
+                return False
+        return True
 
     def get_device_info(self) -> GroupInfo | None:
         return self._info
@@ -161,6 +177,7 @@ class GroupClient:
         if (prepared.width, prepared.height) != (info.width, info.height):
             prepared = await asyncio.to_thread(media.prepare, prepared.data, info.width, info.height, "crop",
                                                media.DEFAULT_BUDGET_KB * info.panels)
+        self._stop_resync()  # new content: the old animation's re-syncing ends
         tiles = await asyncio.to_thread(media.split, prepared, self.spec.cols, self.spec.rows)
         animated = prepared.ext == ".gif"
         slot = self.spec.sync_slot if animated else None
@@ -176,6 +193,18 @@ class GroupClient:
         if progress:
             progress(1, 1, len(prepared.data), len(prepared.data))
         if animated:
+            if not self.can_sync():
+                self.manager._emit("group_unsynced", address=self.spec.address)
+                return
+            await self._restart_together(slot)
+            cycle = sum(media.decode(prepared)[1]) / 1000
+            if cycle > 0:
+                self._resync = asyncio.get_running_loop().create_task(self._keep_in_step(slot, cycle))
+
+    async def _keep_in_step(self, slot: int | None, cycle: float) -> None:
+        """Restart all panels together at the start of every loop of the animation."""
+        while True:
+            await asyncio.sleep(cycle)
             await self._restart_together(slot)
 
     async def _restart_together(self, slot: int | None) -> None:

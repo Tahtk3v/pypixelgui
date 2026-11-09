@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from .. import render
 from .http import get_json
@@ -138,6 +138,44 @@ def parse_departures(data: dict, lines: list[str] | None = None, now: datetime |
 
 # --- drawing -----------------------------------------------------------------------
 
+def transport_icon(kind: str, size: int) -> Image.Image:
+    """Small pictogram for the kind of vehicle, ``size`` pixels square."""
+    s = size
+    im = Image.new("RGB", (s, s))
+    d = ImageDraw.Draw(im)
+    fg = (230, 230, 230)
+    win = (0, 0, 0)
+    k = (kind or "BUS").upper()
+
+    def body(top: float, bottom: float, radius: int):
+        d.rounded_rectangle([s * 0.08, s * top, s * 0.92, s * bottom], radius=radius, fill=fg)
+
+    if k == "METRO":
+        d.ellipse([s * 0.05, s * 0.05, s * 0.95, s * 0.95], fill=(255, 154, 0))
+        m = render.text_mask("M", 16)
+        if m.width <= s and m.height <= s:
+            im.paste((0, 0, 0), ((s - m.width) // 2, (s - m.height) // 2), m)
+        return im
+    if k == "BOAT":
+        d.polygon([(s * 0.05, s * 0.55), (s * 0.95, s * 0.55), (s * 0.78, s * 0.85), (s * 0.22, s * 0.85)], fill=fg)
+        d.rectangle([s * 0.3, s * 0.3, s * 0.65, s * 0.55], fill=fg)
+        d.line([s * 0.05, s * 0.95, s * 0.95, s * 0.95], fill=(60, 140, 255), width=max(1, s // 16))
+        return im
+    if k == "TRAM":
+        d.line([s * 0.5, s * 0.02, s * 0.5, s * 0.18], fill=fg, width=max(1, s // 16))   # pantograph
+        d.line([s * 0.3, s * 0.02, s * 0.7, s * 0.02], fill=fg, width=max(1, s // 16))
+        body(0.18, 0.85, max(1, s // 6))
+    elif k == "TRAIN":
+        body(0.12, 0.85, max(2, s // 3))
+    else:  # BUS
+        body(0.12, 0.8, max(1, s // 8))
+    # windows and wheels
+    d.rectangle([s * 0.2, s * 0.3, s * 0.8, s * 0.5], fill=win)
+    for cx in (0.3, 0.7):
+        d.ellipse([s * (cx - 0.1), s * 0.75, s * (cx + 0.1), s * 0.95], fill=(150, 150, 150))
+    return im
+
+
 def _short(text: str, n: int = 18) -> str:
     return text if len(text) <= n else text[: n - 1] + "…"
 
@@ -154,6 +192,7 @@ def segments(deps: list[Departure], height: int, label: str = "", count: int = 3
         return segs
     for d in deps[:count]:
         fg, bg = TYPE_COLOURS.get(d.transport, TYPE_COLOURS["BUS"])
+        segs.append(transport_icon(d.transport, min(height, size)))
         segs.append(render.badge(d.line, fg, bg, height, size))
         segs.append(render.text_segment(_short(d.destination), "ffffff", height, size))
         if d.cancelled:
@@ -168,5 +207,5 @@ def segments(deps: list[Departure], height: int, label: str = "", count: int = 3
 
 
 def frames(deps: list[Departure], width: int, height: int, label: str = "", count: int = 3,
-           now: datetime | None = None) -> list[render.Frame]:
-    return render.marquee(segments(deps, height, label, count, now), width, height, gap=5)
+           now: datetime | None = None, speed: float = render.SCROLL_SPEEDS["normal"]) -> list[render.Frame]:
+    return render.marquee(segments(deps, height, label, count, now), width, height, gap=5, speed=speed)

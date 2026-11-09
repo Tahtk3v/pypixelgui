@@ -114,3 +114,22 @@ def test_http_cache_and_error(monkeypatch):
     monkeypatch.setattr(http.time, "sleep", lambda s: None)
     with pytest.raises(http.FetchError, match="x.test"):
         http.get_json("https://x.test/b")
+
+
+def test_scroll_speed_sets_pixels_per_second():
+    from pypixelgui import render
+    deps = transit.parse_departures(load("ovapi_stoparea_sample.json"), now=NOW)
+    for name, pps in render.SCROLL_SPEEDS.items():
+        frames = transit.frames(deps, 64, 16, now=NOW, speed=pps)
+        seconds = sum(d for _, d in frames) / 1000
+        travelled = 64 + sum(s.width for s in transit.segments(deps, 16, count=3, now=NOW))
+        assert abs(travelled / seconds - pps) / pps < 0.25, name
+
+
+def test_departures_show_transport_pictogram():
+    deps = transit.parse_departures(load("ovapi_stoparea_sample.json"), now=NOW)
+    segs = transit.segments(deps[:1], 16, now=NOW)
+    icon = transit.transport_icon("TRAM", 16)
+    assert segs[0].tobytes() == icon.tobytes()  # tram 22 starts with the tram pictogram
+    for kind in ("BUS", "TRAM", "METRO", "BOAT", "TRAIN"):
+        assert transit.transport_icon(kind, 16).getbbox()
