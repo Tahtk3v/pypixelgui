@@ -84,3 +84,63 @@ def test_ns_departures_and_stations():
     ns.set_api_key("")
     with pytest.raises(Exception, match="API key"):
         ns.fetch_departures("UT")
+
+
+# --- CCC ------------------------------------------------------------------------------
+
+BERLIN = ZoneInfo("Europe/Berlin")
+
+
+def test_congress_39c3_parses_in_berlin_time():
+    s = sched("frab_39c3_sample.xml")
+    assert s.title == "39th Chaos Communications Congress" and len(s.talks) == 82
+    assert all(t.start.utcoffset().total_seconds() == 3600 for t in s.talks)  # CET in December
+    first_day = s.talks[0].start.astimezone(BERLIN).date().isoformat()
+    assert first_day == "2025-12-27"
+
+
+def test_camp23_parses():
+    s = sched("frab_camp23_sample.xml")
+    assert s.title == "Chaos Communication Camp 2023" and set(s.rooms) == {"Milliways", "Marktplatz"}
+    assert all(t.start.utcoffset().total_seconds() == 7200 for t in s.talks)  # CEST in August
+
+
+def test_announced_but_empty_congress_says_when_it_starts():
+    s = sched("frab_40c3_empty.xml")
+    assert s.talks == [] and str(s.start) == "2026-12-27"
+    now = datetime(2026, 11, 9, 14, 0, tzinfo=AMS)
+    assert schedule._status(s, now, "en") == "starts 27 Dec"
+    assert schedule._status(s, now, "nl") == "begint 27 dec"
+
+
+def test_ccc_editions_offline():
+    from datetime import date
+    congress = events.congress_editions(date(2026, 11, 9))
+    assert [e.name for e in congress] == ["40C3 (2026)", "39C3 (2025)", "38C3 (2024)"]
+    assert congress[1].schedule_url == "https://api.events.ccc.de/congress/2025/schedule.xml"
+    camps = events.camp_editions(date(2026, 11, 9))
+    assert [e.name for e in camps] == ["CCCamp 2027", "CCCamp 2023", "CCCamp 2019"]
+    assert camps[1].schedule_url.endswith("/camp/2023/hub/api/c/camp23/schedule.xml")
+    assert [e.name for e in events.camp_editions(date(2024, 1, 1))] == ["CCCamp 2023", "CCCamp 2019"]
+
+
+def test_ccc_icon_candidates_follow_redirects(monkeypatch):
+    # the congress page redirects to /infos/startpage.html and declares a relative icon
+    monkeypatch.setattr(events, "get_page", lambda url, **k: (
+        "https://events.ccc.de/congress/2026/infos/startpage.html",
+        b'<link rel="icon" href="assets/favicon.svg">'))
+    cands = events.icon_candidates("ccc:congress/2026")
+    assert cands[0] == "https://events.ccc.de/congress/2026/hub/static/plainui/img/favicon.ico"
+    assert "https://events.ccc.de/congress/2026/infos/assets/favicon.svg" in cands
+
+
+def test_icon_loader_skips_broken_links_and_renders_svg(monkeypatch, tmp_path):
+    pytest.importorskip("PySide6.QtSvg")
+    svg = (b'<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">'
+           b'<rect width="10" height="10" fill="#75b44b"/></svg>')
+    pages = {"https://x/a.ico": b"<!DOCTYPE html><html>404</html>", "https://x/b.svg": svg}
+    monkeypatch.setattr(events, "get_bytes", lambda url, **k: pages[url])
+    monkeypatch.setattr(events, "icon_candidates", lambda spec: ["https://x/a.ico", "https://x/b.svg"])
+    monkeypatch.setattr(events, "_icon_cache", lambda: tmp_path)
+    im = events.icon("ccc:congress/2026")
+    assert im is not None and im.getpixel((im.width // 2, im.height // 2))[:3] == (0x75, 0xB4, 0x4B)

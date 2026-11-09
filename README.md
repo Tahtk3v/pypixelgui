@@ -31,8 +31,10 @@ A cross-platform (Windows / macOS / Linux) desktop app for Bluetooth LED display
   - **Departures** – real-time Dutch buses, trams, metro and ferries (OVapi), with the
     vehicle type and platform when known; **trains with platforms** via the NS API
     (needs a free personal key from apiportal.ns.nl).
-  - **Event schedules** – what's on now and next at BornHack, eth0 or any event that
-    publishes a frab/pretalx `schedule.xml`, with the room and the event's own icon.
+  - **Event schedules** – what's on now and next at BornHack, eth0, CCC Congress (38C3,
+    39C3, 40C3…) and CCCamp, or any event that publishes a frab/pretalx `schedule.xml`,
+    with the room and the event's own icon. *Rooms…* picks rooms from the schedule
+    (Congress has hundreds); events that haven't started say when they start.
   - Text size and scroll speed (characters per second) adapt to the panel; panels two or
     more rows tall show rows (pages of departures/talks) instead of one scrolling line.
 - **Combine displays** – put identical displays side by side or stacked and use them as one
@@ -85,8 +87,10 @@ The GUI picks up the add-on automatically and shows an **MQTT** tab.
   cached in the settings folder. Trains: [NS API](https://apiportal.ns.nl/) – free personal
   key (product "Ns-App"); paste it on the Live tab.
 - Event schedules: frab XML exports (BornHack: `/bornhack-YYYY/program/frab.xml`,
-  eth0: `content.eth0.nl/en/<edition>/public/schedule.xml`). Icons come from the event's
-  website and are cached in the settings folder.
+  eth0: `content.eth0.nl/en/<edition>/public/schedule.xml`, Congress:
+  `api.events.ccc.de/congress/YYYY/schedule.xml`, CCCamp: the event hub's export). Icons
+  come from the event's website or hub (SVG icons are rendered too) and are cached in the
+  settings folder.
 
 ## Locking displays
 
