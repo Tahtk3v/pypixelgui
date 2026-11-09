@@ -123,9 +123,9 @@ def test_scroll_speed_is_characters_per_second_on_any_panel(size):
     font = render.font_for(*size)
     for name, cps in render.SCROLL_SPEEDS.items():
         frames = transit.frames(deps, *size, now=NOW, speed=name, layout="line")
-        seconds = sum(d for _, d in frames) / 1000
-        travelled = size[0] + render._strip(transit.segments(deps, size[1], count=3, now=NOW, size=font),
-                                            size[1], 4).width
+        lead = frames[0][1] - frames[1][1]  # the pause on the first frame isn't scrolling
+        seconds = (sum(d for _, d in frames) - lead) / 1000
+        travelled = render._strip(transit.segments(deps, size[1], count=3, now=NOW, size=font), size[1], 4).width
         chars_per_s = travelled / seconds / (font / 2)
         assert abs(chars_per_s - cps) / cps < 0.25, (name, chars_per_s)
 
@@ -137,3 +137,12 @@ def test_departures_show_transport_pictogram():
     assert segs[0].tobytes() == icon.tobytes()  # tram 22 starts with the tram pictogram
     for kind in ("BUS", "TRAM", "METRO", "BOAT", "TRAIN"):
         assert transit.transport_icon(kind, 16).getbbox()
+
+
+def test_scroll_starts_with_text_on_screen():
+    from pypixelgui import render
+    deps = transit.parse_departures(load("ovapi_stoparea_sample.json"), now=NOW)
+    frames = transit.frames(deps, 64, 16, now=NOW, layout="line")
+    first, ms = frames[0]
+    assert first.getbbox() is not None and first.getbbox()[0] <= 2  # text at the left edge, not blank
+    assert ms >= 1000  # held so the beginning can be read

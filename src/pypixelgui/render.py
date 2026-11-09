@@ -223,21 +223,27 @@ def _step_and_ms(distance: int, pps: float) -> tuple[int, int]:
 
 
 def marquee(segments: list[Image.Image], width: int, height: int, gap: int = 4, hold_ms: int = 4000,
-            speed="normal", size: int = 16) -> list[Frame]:
-    """Join segments left to right; show still if it fits, otherwise scroll it through once."""
+            speed="normal", size: int = 16, lead_ms: int = 1200) -> list[Frame]:
+    """Join segments left to right; show still if it fits, otherwise scroll it.
+
+    The text starts already on screen at the left edge and pauses ``lead_ms``
+    so its beginning can be read, then scrolls until it has left the panel –
+    no seconds of empty panel while text crawls in from the right (which
+    matters most on small 64×16 panels).
+    """
     strip = _strip(segments, height, gap)
     total = strip.width
     if total <= width:
         frame = Image.new("RGB", (width, height))
         frame.paste(strip, ((width - total) // 2, 0))
         return [(frame, hold_ms)]
-    distance = width + total
-    step, frame_ms = _step_and_ms(distance, pixels_per_second(speed, size))
+    step, frame_ms = _step_and_ms(total, pixels_per_second(speed, size))
     out = []
-    for x in range(width, -total - 1, -step):
+    for x in range(0, -total - 1, -step):
         frame = Image.new("RGB", (width, height))
         frame.paste(strip, (x, 0))
         out.append((frame, frame_ms))
+    out[0] = (out[0][0], max(frame_ms, lead_ms))
     return out
 
 
