@@ -22,6 +22,13 @@ class FetchError(RuntimeError):
 def get_bytes(url: str, params: dict | None = None, *, ttl: float = 0, timeout: float = 15,
               retries: int = 2, headers: dict | None = None) -> bytes:
     """GET ``url``; the body is reused for ``ttl`` seconds. Follows redirects."""
+    return get_page(url, params, ttl=ttl, timeout=timeout, retries=retries, headers=headers)[1]
+
+
+def get_page(url: str, params: dict | None = None, *, ttl: float = 0, timeout: float = 15,
+             retries: int = 2, headers: dict | None = None) -> tuple[str, bytes]:
+    """Like :func:`get_bytes`, also returning the final URL after redirects
+    (needed to resolve relative links on the page)."""
     if params:
         url = f"{url}?{urllib.parse.urlencode(params)}"
     now = time.monotonic()
@@ -34,7 +41,8 @@ def get_bytes(url: str, params: dict | None = None, *, ttl: float = 0, timeout: 
         try:
             req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
-                body = resp.read()
+                final = getattr(resp, "geturl", lambda: url)() or url
+                body = (final, resp.read())
             break
         except urllib.error.HTTPError as e:
             if e.code in (401, 403):

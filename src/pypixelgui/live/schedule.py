@@ -22,8 +22,10 @@ from .http import get_bytes
 
 CACHE_SECONDS = 300
 DAYS = {"en": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], "nl": ["ma", "di", "wo", "do", "vr", "za", "zo"]}
-WORDS = {"en": {"now": "now", "done": "event finished", "none": "nothing scheduled"},
-         "nl": {"now": "nu", "done": "evenement voorbij", "none": "niets gepland"}}
+WORDS = {"en": {"now": "now", "done": "event finished", "none": "nothing scheduled", "starts": "starts"},
+         "nl": {"now": "nu", "done": "evenement voorbij", "none": "niets gepland", "starts": "begint"}}
+MONTHS = {"en": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+          "nl": ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"]}
 
 
 @dataclass(frozen=True)
@@ -127,6 +129,9 @@ def _status(sched: Schedule, now: datetime, lang: str) -> str:
     words = WORDS.get(lang, WORDS["en"])
     if sched.talks and now > max(t.end for t in sched.talks):
         return words["done"]
+    first = min((t.start.date() for t in sched.talks), default=sched.start)
+    if first and now.date() < first:
+        return f"{words['starts']} {first.day} {MONTHS.get(lang, MONTHS['en'])[first.month - 1]}"
     return words["none"]
 
 

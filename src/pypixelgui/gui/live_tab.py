@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import threading
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
+    QComboBox, QDialog, QDialogButtonBox, QFormLayout, QGroupBox, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QPushButton, QSpinBox, QVBoxLayout, QWidget,
 )
 
@@ -287,6 +287,10 @@ class LiveTab(QWidget):
         form.addRow("", self.custom_row)
         opts = QHBoxLayout()
         self.rooms = QLineEdit(placeholderText="Only rooms (comma-separated) – empty = all")
+        pick_rooms = QPushButton("Rooms…")
+        pick_rooms.setToolTip("Pick rooms from the schedule – handy at Congress, which has hundreds")
+        pick_rooms.clicked.connect(self._pick_rooms)
+        opts.addWidget(pick_rooms)
         self.e_count = QSpinBox(minimum=1, maximum=10, value=4, suffix=" talks")
         self.e_lang = QComboBox()
         self.e_lang.addItems(["en", "nl"])
@@ -297,6 +301,35 @@ class LiveTab(QWidget):
         form.addRow("Show", self._wrap(opts))
         form.addRow(self._wrap(self._actions(self._event_entry)))
         return box
+
+    def _schedule_url(self) -> str | None:
+        if self.event_kind.currentData() == "custom":
+            return self.event_url.text().strip() or None
+        ed = self.editions.currentData()
+        return ed.schedule_url if isinstance(ed, events.Edition) else None
+
+    def _pick_rooms(self) -> None:
+        url = self._schedule_url()
+        if not url:
+            self.window.log("Choose an edition (or paste a schedule URL) first.")
+            return
+        self.window.log("Loading the schedule to list its rooms…")
+
+        def done(res):
+            if isinstance(res, Exception):
+                self.window.log(f"Could not load the schedule: {res}")
+                return
+            counts: dict[str, int] = {}
+            for t in res.talks:
+                counts[t.room] = counts.get(t.room, 0) + 1
+            if not counts:
+                self.window.log("This schedule has no talks yet.")
+                return
+            chosen = {r.strip().lower() for r in self.rooms.text().split(",") if r.strip()}
+            dlg = RoomDialog(self, counts, chosen)
+            if dlg.exec():
+                self.rooms.setText(", ".join(dlg.selected()))
+        self._background(lambda: schedule.fetch(url), done)
 
     def _event_kind_changed(self) -> None:
         custom = self.event_kind.currentData() == "custom"
@@ -336,6 +369,7 @@ class LiveTab(QWidget):
                 self.window.log("Click “Find editions” and pick one first.")
                 return None
             url, name, icon = ed.schedule_url, ed.name, ed.icon_url
+            name = name.split(" (")[0]  # "39C3 (2025)" → "39C3": short labels scroll less
         return {"name": f"Schedule {name}", "description": f"What's on at {name}",
                 "steps": [["schedule", {"url": url, "icon": icon, "label": "" if self.event_kind.currentData()
                                         == "custom" else name, "rooms": rooms, "count": self.e_count.value(),
@@ -365,3 +399,40 @@ class LiveTab(QWidget):
         w = QWidget()
         w.setLayout(layout)
         return w
+
+
+class RoomDialog(QDialog):
+    """Checklist of a schedule's rooms (busiest first), with a filter box."""
+
+    def __init__(self, parent, counts: dict[str, int], chosen: set[str]):
+        super().__init__(parent)
+        self.setWindowTitle("Rooms to show")
+        self.resize(420, 480)
+        lay = QVBoxLayout(self)
+        self.filter = QLineEdit(placeholderText="Filter rooms…")
+        self.filter.textChanged.connect(self._apply_filter)
+        lay.addWidget(self.filter)
+        self.list = QListWidget()
+        for room, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+            it = QListWidgetItem(f"{room}  ({n})")
+            it.setData(0x0100, room)
+            it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
+            it.setCheckState(Qt.Checked if room.lower() in chosen else Qt.Unchecked)
+            self.list.addItem(it)
+        lay.addWidget(self.list)
+        note = QLabel("Nothing ticked = all rooms.")
+        lay.addWidget(note)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        lay.addWidget(buttons)
+
+    def _apply_filter(self, text: str) -> None:
+        t = text.lower()
+        for i in range(self.list.count()):
+            it = self.list.item(i)
+            it.setHidden(bool(t) and t not in it.data(0x0100).lower())
+
+    def selected(self) -> list[str]:
+        return [self.list.item(i).data(0x0100) for i in range(self.list.count())
+                if self.list.item(i).checkState() == Qt.Checked]
