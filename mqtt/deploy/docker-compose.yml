@@ -1,0 +1,17 @@
+# Run next to Home Assistant / Mosquitto. First-time setup (one-off commands):
+#   docker compose run --rm pypixelgui-bridge scan
+#   docker compose run --rm pypixelgui-bridge add <ADDRESS> --name "Desk sign"
+#   docker compose up -d
+services:
+  pypixelgui-bridge:
+    build:
+      context: ../..
+      dockerfile: mqtt/deploy/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./config:/config
+      - /run/dbus:/run/dbus:ro          # talk to the host's Bluetooth (BlueZ)
+    environment:
+      PYPIXELGUI_MQTT_HOST: "192.168.1.10"   # your broker, e.g. Home Assistant's Mosquitto add-on
+      PYPIXELGUI_MQTT_USERNAME: "pypixel"
+      PYPIXELGUI_MQTT_PASSWORD: "change-me"

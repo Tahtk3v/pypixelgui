@@ -274,7 +274,10 @@ class MainWindow(QMainWindow):
             self.log("Connect to a display first.")
             return
         self._interrupt_rotation(addr)
-        self.manager.run_preset(addr, preset)
+        self.manager.show_preset(addr, preset)
+        if preset.refresh:
+            self.log(f"“{preset.name}” keeps itself up to date (checks every {preset.refresh / 60:g} min); "
+                     "sending anything else stops that.")
 
     def _interrupt_rotation(self, addr: str) -> None:
         """Anything sent by hand takes over the display, so the rotation stops."""

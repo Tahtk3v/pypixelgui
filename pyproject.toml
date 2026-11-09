@@ -11,7 +11,9 @@ requires-python = ">=3.10"
 license = "MIT"
 dependencies = [
   "pypixelcolor>=0.5.0",
-  "PySide6>=6.6",
+  # The desktop GUI. Skipped on 32-bit ARM (Pi Zero, old Pi OS), where Qt has no
+  # wheels – the headless MQTT bridge doesn't need it.
+  "PySide6>=6.6; platform_machine != 'armv7l' and platform_machine != 'armv6l'",
   "Pillow",
   "certifi",
   "truststore>=0.9",

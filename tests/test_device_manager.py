@@ -200,3 +200,39 @@ def test_scan_remembers_kind_and_panel():
         assert m.kind("BB") == "iledcolor"
     finally:
         m.shutdown()
+
+
+def test_live_preset_reuploads_only_when_content_changes(manager):
+    from pypixelgui.presets import Preset
+    manager.connect("AA").result(2)
+    text = {"value": "12 3'"}
+    live = Preset("Bus", "My presets", "", lambda w, h: [("send_text", {"text": text["value"]})], refresh=0.5)
+    manager.show_preset("AA", live)
+    client = FakeClient.instances[-1]
+    assert _wait(lambda: len(client.calls) == 1)
+    time.sleep(1.2)                       # two re-checks, nothing changed
+    assert len(client.calls) == 1 and "live_unchanged" in manager.events
+    text["value"] = "12 2'"               # the departure is now a minute closer
+    assert _wait(lambda: len(client.calls) == 2)
+    assert client.calls[-1] == ("send_text", {"text": "12 2'"})
+    # sending anything else by hand stops the updating
+    manager.stop_rotation("AA")
+    manager.run("AA", "set_brightness", {"level": 10}).result(2)
+    text["value"] = "12 1'"
+    time.sleep(1.0)
+    assert client.calls[-1] == ("set_brightness", {"level": 10})
+
+
+def test_static_preset_is_shown_once(manager):
+    from pypixelgui import presets
+    manager.connect("AA").result(2)
+    manager.show_preset("AA", presets.find("ON AIR")).result(2)
+    assert not manager.rotation_running("AA")
+
+
+def test_live_presets_have_sensible_refresh():
+    from pypixelgui import presets
+    weather = presets.user_preset({"name": "w", "steps": [["weather", {"latitude": 1, "longitude": 2}]]})
+    bus = presets.user_preset({"name": "b", "steps": [["transit", {"stop": "x"}]]})
+    custom = presets.user_preset({"name": "c", "steps": [["schedule", {"url": "u", "refresh": 300}]]})
+    assert (weather.refresh, bus.refresh, custom.refresh) == (600, 60, 300)

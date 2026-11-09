@@ -1,0 +1,18 @@
+# systemd service for the pypixelgui MQTT bridge (see docs/sbc.md).
+# Install:  sudo cp pypixelgui-bridge.service /etc/systemd/system/
+#           sudo systemctl enable --now pypixelgui-bridge
+[Unit]
+Description=pypixelgui MQTT bridge (LED displays over Bluetooth)
+After=network-online.target bluetooth.target
+Wants=network-online.target bluetooth.target
+
+[Service]
+User=pypixel
+SupplementaryGroups=bluetooth
+Environment=XDG_CONFIG_HOME=/var/lib/pypixelgui
+ExecStart=/opt/pypixelgui/bin/pypixelgui-bridge run
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

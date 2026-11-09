@@ -54,8 +54,9 @@ class LiveTab(QWidget):
         show = self.window._send_row("Show now", lambda: self._show(make_entry()))
         every = QSpinBox(minimum=1, maximum=240, value=5, suffix=" min")
         keep = self.window._send_row("Keep updated every", lambda: self._keep(make_entry(), every.value()))
+        every.setToolTip("How often it checks for changes (also for the saved preset)")
         save = QPushButton("Save as preset…")
-        save.clicked.connect(lambda: self._save(make_entry()))
+        save.clicked.connect(lambda: self._save(make_entry(), every.value()))
         for wdg in (show, keep, every, save):
             row.addWidget(wdg)
         row.addStretch()
@@ -68,17 +69,20 @@ class LiveTab(QWidget):
         if entry:
             self.window._run_preset(self._preset(entry))
 
-    def _keep(self, entry, minutes: int) -> None:
-        addr = self.window.current_address()
-        if not entry or not addr or not self.window.manager.is_connected(addr):
-            if entry:
-                self.window.log("Connect to a display first.")
-            return
-        self.window.manager.start_rotation(addr, [(self._preset(entry), minutes * 60)], loop=True)
-        self.window.log(f"Showing “{entry['name']}”, refreshed every {minutes} min (stop it on the Rotation tab)")
-        self.window.refresh_device_list()
+    @staticmethod
+    def _with_refresh(entry, minutes: int):
+        if entry:
+            entry["steps"][0][1]["refresh"] = int(minutes) * 60
+        return entry
 
-    def _save(self, entry) -> None:
+    def _keep(self, entry, minutes: int) -> None:
+        entry = self._with_refresh(entry, minutes)
+        if entry:
+            self.window._run_preset(self._preset(entry))
+            self.window.refresh_device_list()
+
+    def _save(self, entry, minutes: int) -> None:
+        entry = self._with_refresh(entry, minutes)
         if not entry:
             return
         name, ok = QInputDialog.getText(self, "Save preset", "Preset name:", text=entry["name"])

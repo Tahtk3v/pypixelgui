@@ -371,7 +371,7 @@ class MqttBridge:
         if preset is None:
             raise CommandError(f"unknown preset {name!r}")
         self.manager.stop_rotation(address)
-        return self.manager.run_preset(address, preset, **self._opts())
+        return self.manager.show_preset(address, preset, **self._opts())
 
     def _rotation(self, alias: str, address: str, name: str) -> None:
         if name.lower() in ("", "stop", "off", ha.NO_ROTATION):
