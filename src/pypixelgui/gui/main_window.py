@@ -110,6 +110,7 @@ class MainWindow(QMainWindow):
         outer.addWidget(self.log_view)
         outer.setSizes([520, 160])
         self.setCentralWidget(outer)
+        self._build_menu()
 
         for dev in settings.devices:
             manager.remember(dev.address, dev.kind, dev.panel, dev.password)
@@ -130,6 +131,28 @@ class MainWindow(QMainWindow):
         self._ui_ready = True
         self._update_controls()
         self._load_plugin_tabs()
+
+    def _build_menu(self) -> None:
+        from PySide6.QtGui import QAction, QActionGroup
+        view = self.menuBar().addMenu("&View")
+        theme_menu = view.addMenu("Theme")
+        group = QActionGroup(self)
+        group.setExclusive(True)
+        self.theme_actions = {}
+        for key, label in (("system", "Follow system"), ("light", "Light"), ("dark", "Dark")):
+            act = QAction(label, self, checkable=True)
+            act.setChecked(self.settings.theme == key)
+            act.triggered.connect(lambda _=False, k=key: self.set_theme(k))
+            group.addAction(act)
+            theme_menu.addAction(act)
+            self.theme_actions[key] = act
+
+    def set_theme(self, theme: str) -> None:
+        from PySide6.QtWidgets import QApplication
+        from .theme import apply
+        self.settings.theme = theme
+        apply(QApplication.instance(), theme)
+        self.save_settings()
 
     def _load_plugin_tabs(self) -> None:
         """Add tabs from installed add-ons (entry point group ``pypixelgui.tabs``)."""
@@ -633,6 +656,22 @@ class MainWindow(QMainWindow):
             self.device_list.setCurrentItem(it)
         return it
 
+    def _drop_missing(self, found: set[str]) -> int:
+        """After a scan, remove displays it didn't see – except connected ones (they don't
+        advertise while connected) and groups (virtual). Saved displays stay saved."""
+        current = self.current_address()
+        removed = 0
+        for i in reversed(range(self.device_list.count())):
+            addr = self.device_list.item(i).data(ADDR_ROLE)
+            if addr in found or groups_mod.is_group(addr) or self.manager.is_connected(addr) \
+                    or self.manager.is_held(addr):
+                continue
+            self.device_list.takeItem(i)
+            removed += 1
+        if current and self.current_address() != current:
+            self._update_controls()
+        return removed
+
     def _render_item(self, it: QListWidgetItem) -> None:
         addr = it.data(ADDR_ROLE)
         tags = []
@@ -954,7 +993,9 @@ class MainWindow(QMainWindow):
             devices: list[FoundDevice] = data["devices"]
             for d in devices:
                 self._upsert_item(d.address, d.name)
-            self.log(f"Scan found {len(devices)} display(s).")
+            removed = self._drop_missing({d.address for d in devices})
+            self.log(f"Scan found {len(devices)} display(s)."
+                     + (f" Removed {removed} that weren't found." if removed else ""))
         elif event == "error":
             self.scan_btn.setEnabled(True)
             self.scan_btn.setText("Scan")

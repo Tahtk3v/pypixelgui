@@ -22,7 +22,10 @@ def main(argv: list[str] | None = None) -> int:
     logging.getLogger(__name__).info("HTTPS certificates: %s", ensure_ca_certificates())
     app = QApplication(sys.argv if argv is None else argv)
     app.setApplicationName("PyPixel GUI")
-    window = MainWindow(DeviceManager(), Settings.load())
+    from .theme import apply as apply_theme
+    settings = Settings.load()
+    apply_theme(app, settings.theme)
+    window = MainWindow(DeviceManager(), settings)
     window.show()
     return app.exec()
 
