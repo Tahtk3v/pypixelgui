@@ -154,3 +154,49 @@ def encode_gif(frames: Iterable[Frame]) -> bytes:
     images[0].save(buf, format="GIF", save_all=True, append_images=images[1:],
                    duration=[d for _, d in frames], loop=0, disposal=1, optimize=False)
     return buf.getvalue()
+
+
+# --- strips of text and icons (weather, departures) ---------------------------------
+
+def segment_font_size(height: int) -> int:
+    """Largest crisp Unifont size for this height (16, 32, …)."""
+    return max(16, 16 * (height // 16))
+
+
+def text_segment(text: str, color: str, height: int, size: int | None = None) -> Image.Image:
+    """Text drawn on black, ``height`` tall, as narrow as the text."""
+    mask = text_mask(text, size or segment_font_size(height))
+    seg = Image.new("RGB", (mask.width, height))
+    seg.paste(_rgb(color), (0, max(0, (height - mask.height) // 2)), mask)
+    return seg
+
+
+def badge(text: str, fg: str, bg: str, height: int, size: int | None = None, pad: int = 2) -> Image.Image:
+    """Text on a coloured block (line numbers)."""
+    mask = text_mask(text, size or segment_font_size(height))
+    seg = Image.new("RGB", (mask.width + 2 * pad, height), _rgb(bg))
+    seg.paste(_rgb(fg), (pad, max(0, (height - mask.height) // 2)), mask)
+    return seg
+
+
+def marquee(segments: list[Image.Image], width: int, height: int, gap: int = 4, hold_ms: int = 4000,
+            step_ms: int = 50) -> list[Frame]:
+    """Join segments left to right; show still if it fits, otherwise scroll it through once."""
+    total = sum(s.width for s in segments) + gap * max(0, len(segments) - 1)
+    strip = Image.new("RGB", (max(1, total), height))
+    x = 0
+    for s in segments:
+        strip.paste(s, (x, (height - s.height) // 2))
+        x += s.width + gap
+    if total <= width:
+        frame = Image.new("RGB", (width, height))
+        frame.paste(strip, ((width - total) // 2, 0))
+        return [(frame, hold_ms)]
+    distance = width + total
+    step = max(1, -(-distance // (MAX_SCROLL_FRAMES * 2)))
+    out = []
+    for x in range(width, -total - 1, -step):
+        frame = Image.new("RGB", (width, height))
+        frame.paste(strip, (x, 0))
+        out.append((frame, step_ms))
+    return out

@@ -26,9 +26,49 @@ pip install ./mqtt
 pypixelgui-bridge
 ```
 
+## Home Assistant
+
+With **Home Assistant discovery** on (the default), every saved display and display group
+appears in HA as a device – no YAML needed. Point the bridge at the same broker HA uses
+(e.g. the Mosquitto add-on) and they show up under *Settings → Devices → MQTT*:
+
+| Entity | What it does |
+|---|---|
+| Light | on/off, brightness; **effect** = any preset (CYBER, flags, your own, weather, departures) |
+| Text "Message" | type a message, it appears on the display |
+| Select "Preset" | pick a preset |
+| Select "Rotation" | start a saved rotation, or "—" to stop |
+| Switch "Hold connection" | keep the display connected so phones can't take over |
+| Binary sensor "Bluetooth" | whether the display is connected (diagnostic) |
+
+Displays connect automatically when commanded. Entities become unavailable when the
+bridge goes offline (MQTT last will). Discovery is re-sent when HA restarts, and entities
+of displays you remove are cleaned up.
+
+Automation example – show the departures preset when you walk in:
+
+```yaml
+action: light.turn_on
+target: {entity_id: light.desk_sign}
+data: {effect: "Vertrek Utrecht, Centraal Station"}
+```
+
+## zigbee2mqtt-style topics
+
+Same idea as zigbee2mqtt, for Node-RED and other tools:
+
+- `<base>/<alias>` – state JSON (retained):
+  `{"state":"ON","brightness":128,"preset":"CYBER","text":"","rotation":"—","hold":"OFF","connected":true}`
+- `<base>/<alias>/set` – JSON with any of `state` (`ON`/`OFF`/`TOGGLE`), `brightness` (0–255),
+  `effect` or `preset`, `text` (plus `color`, `bg_color`, `animation`, `speed`), `rotation`, `hold`.
+
+```bash
+mosquitto_pub -t pypixel/desk/set -m '{"state":"ON","brightness":200,"effect":"Trans flag"}'
+```
+
 ## Topics
 
-`<base>` defaults to `pypixel`; `<alias>` is the display's alias from the GUI's Security tab.
+`<base>` defaults to `pypixel`; `<alias>` is the display's (or display group's) alias from the GUI's Security tab.
 
 | Topic | Payload |
 |---|---|

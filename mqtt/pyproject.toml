@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pypixelgui-mqtt"
-version = "0.1.0"
+version = "0.2.0"
 description = "MQTT bridge for pypixelgui: drive iPixel Color LED displays from Home Assistant, Node-RED, etc."
 readme = "README.md"
 requires-python = ">=3.10"

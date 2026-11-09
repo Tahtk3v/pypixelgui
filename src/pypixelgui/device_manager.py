@@ -20,7 +20,7 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Optional
 
-from . import media
+from . import groups, media
 from .commands import to_client_call, validate
 
 #: Commands that can store their content in a device slot.
@@ -117,11 +117,13 @@ class DeviceManager:
         self._client_factory = client_factory or self._make_client
         #: What we know about each address before connecting: kind, panel, password.
         self._hints: dict[str, dict] = {}
+        self._groups: dict[str, groups.GroupSpec] = {}
         self._scan_func = scan_func
         self._watchdog_interval = watchdog_interval
         self._clients: dict[str, Any] = {}
         self._held: set[str] = set()
         self._rotations: dict[str, concurrent.futures.Future] = {}
+        self._rotation_names: dict[str, str] = {}
         self._cmd_locks: dict[str, asyncio.Lock] = {}
         self._listeners: list[Listener] = []
         self._loop = asyncio.new_event_loop()
@@ -176,7 +178,25 @@ class DeviceManager:
             hint["password"] = password
 
     def kind(self, address: str) -> str:
+        if groups.is_group(address):
+            return "group"
         return self._hints.get(address, {}).get("kind", KIND_IPIXEL)
+
+    # --- groups -------------------------------------------------------------
+
+    def set_group(self, spec: "groups.GroupSpec") -> None:
+        """Add or replace a display group (reachable at ``spec.address``)."""
+        spec.validate()
+        self._groups[spec.alias] = spec
+
+    def remove_group(self, alias: str) -> concurrent.futures.Future:
+        async def go():
+            await self._disconnect(groups.address_of(alias))
+            self._groups.pop(alias, None)
+        return self.submit(go())
+
+    def group(self, address: str) -> "groups.GroupSpec | None":
+        return self._groups.get(address[len(groups.PREFIX):]) if groups.is_group(address) else None
 
     def capabilities(self, address: str) -> Optional[frozenset]:
         """Commands the connected display supports; None means "everything"."""
@@ -184,6 +204,11 @@ class DeviceManager:
         return getattr(type(client), "capabilities", None) if client is not None else None
 
     def _make_client(self, address: str):
+        if groups.is_group(address):
+            spec = self.group(address)
+            if spec is None:
+                raise RuntimeError(f"unknown group {address}")
+            return groups.GroupClient(self, spec)
         hint = self._hints.get(address, {})
         if hint.get("kind") == KIND_ILEDCOLOR:
             from .drivers.iledcolor import ILedColorClient
@@ -220,9 +245,16 @@ class DeviceManager:
         return self.submit(self._disconnect(address))
 
     def run(self, address: str, command: str, params: dict | None = None, *,
-            remote: bool = False, allow_destructive: bool = True) -> concurrent.futures.Future:
-        """Validate and run a command. Validation errors surface on the Future."""
-        return self.submit(self._run(address, command, params, remote, allow_destructive))
+            remote: bool = False, allow_destructive: bool = True,
+            connect: bool = False) -> concurrent.futures.Future:
+        """Validate and run a command. Validation errors surface on the Future.
+
+        ``connect=True`` connects first if needed (remote control, e.g. Home Assistant)."""
+        async def go():
+            if connect:
+                await self._ensure_connected(address)
+            return await self._run(address, command, params, remote, allow_destructive)
+        return self.submit(go())
 
     def run_steps(self, address: str, steps: list[tuple[str, dict]], *, remote: bool = False,
                   allow_destructive: bool = True) -> concurrent.futures.Future:
@@ -233,15 +265,24 @@ class DeviceManager:
         return self.submit(_all())
 
     def run_preset(self, address: str, preset, *, remote: bool = False,
-                   allow_destructive: bool = True) -> concurrent.futures.Future:
+                   allow_destructive: bool = True, connect: bool = False) -> concurrent.futures.Future:
         """Render a :class:`~pypixelgui.presets.Preset` for this display's size and run it."""
-        return self.submit(self._run_preset(address, preset, remote, allow_destructive))
+        async def go():
+            if connect:
+                await self._ensure_connected(address)
+            return await self._run_preset(address, preset, remote, allow_destructive)
+        return self.submit(go())
+
+    async def _ensure_connected(self, address: str) -> None:
+        if not self.is_connected(address):
+            await self._connect(address)
 
     # --- rotation ---------------------------------------------------------
 
     def start_rotation(self, address: str, items: list[tuple[Any, float]], *, loop: bool = True,
                        preload_slot: int | None = None, remote: bool = False,
-                       allow_destructive: bool = True) -> concurrent.futures.Future:
+                       allow_destructive: bool = True, connect: bool = False,
+                       name: str = "") -> concurrent.futures.Future:
         """Cycle through ``(preset, seconds)`` items on one display.
 
         Replaces any rotation already running there. With ``preload_slot`` set,
@@ -252,8 +293,15 @@ class DeviceManager:
         if not items:
             raise ValueError("rotation is empty")
         self.stop_rotation(address)
-        fut = self.submit(self._rotation(address, list(items), loop, preload_slot, remote, allow_destructive))
+
+        async def go():
+            if connect:
+                await self._ensure_connected(address)
+            await self._rotation(address, list(items), loop, preload_slot, remote, allow_destructive)
+        fut = self.submit(go())
         self._rotations[address] = fut
+        self._rotation_names[address] = name
+        self._emit("rotation_started", address=address, name=name)
         fut.add_done_callback(lambda f, a=address: self._rotation_done(a, f))
         return fut
 
@@ -263,6 +311,9 @@ class DeviceManager:
             return False
         fut.cancel()
         return True
+
+    def rotation_name(self, address: str) -> str | None:
+        return self._rotation_names.get(address) if self.rotation_running(address) else None
 
     def rotation_running(self, address: str) -> bool:
         fut = self._rotations.get(address)
@@ -404,6 +455,7 @@ class DeviceManager:
         client = self._require(address, "send_image")
         info = client.get_device_info()
         self._emit("upload_preparing", address=address, name=str(path))
+        budget_kb *= getattr(info, "panels", 1)  # a group gets a budget per panel
         try:
             prepared = await asyncio.to_thread(media.prepare, path, info.width, info.height,
                                                resize_method, budget_kb)
@@ -477,7 +529,8 @@ class DeviceManager:
             raise err
         info = client.get_device_info()
         try:
-            steps = preset.steps(info.width, info.height)
+            # May draw animations or fetch live data – keep it off the Bluetooth loop.
+            steps = await asyncio.to_thread(preset.steps, info.width, info.height)
         except Exception as e:
             self._emit("command_failed", address=address, command=preset.name, message=str(e))
             raise

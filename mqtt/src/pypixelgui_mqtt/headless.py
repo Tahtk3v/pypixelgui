@@ -34,6 +34,12 @@ def main(argv: list[str] | None = None) -> int:
 
     manager = DeviceManager()
     manager.add_listener(lambda ev, data: logging.info("%s %s", ev, data))
+    from pypixelgui.groups import GroupSpec
+    for g in settings.groups:
+        spec = GroupSpec.from_dict(g)
+        manager.set_group(spec)
+        if spec.hold:
+            manager.set_hold(spec.address, True)
     for dev in settings.devices:
         manager.remember(dev.address, dev.kind, dev.panel, dev.password)
         # Headless mode always holds: the point is to own the displays.

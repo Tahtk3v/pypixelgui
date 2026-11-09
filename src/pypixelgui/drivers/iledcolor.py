@@ -59,6 +59,7 @@ class ILedColorClient:
         self._timeout = reply_timeout
         self.is_connected = False
         self.password_set = False
+        self._last_program: tuple[int, int] | None = None
 
     # --- connection ---------------------------------------------------------
 
@@ -213,7 +214,17 @@ class ILedColorClient:
         count = len(content) // (len(p.pack_pixels(frames[0], w, h, ct)) + (0 if self.panel.is_mono else 2))
         return p.program([p.partition(w, h, p.TYPE_FRAMES, count, bytes(content), residence=tick)])
 
+    async def replay_last(self) -> None:
+        """Show the last uploaded program again from its start (used to start a group together).
+
+        The panel already stores it, so it answers "cached" and nothing is re-sent."""
+        if self._last_program is None:
+            return
+        pid, length = self._last_program
+        await self._request(p.CHAR_CONTROL, p.announce_frame(pid, length), p.CMD_ANNOUNCE)
+
     async def _upload(self, pkg: bytes, pid: int, progress: Progress | None) -> None:
+        self._last_program = (pid, len(pkg))
         reply = await self._request(p.CHAR_CONTROL, p.announce_frame(pid, len(pkg)), p.CMD_ANNOUNCE)
         if reply.status == p.ANNOUNCE_CACHED:
             log.info("display already has this content; switching to it without re-uploading")
