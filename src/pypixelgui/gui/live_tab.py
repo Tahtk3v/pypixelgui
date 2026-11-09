@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import presets as presets_mod
-from ..live import transit, weather
+from ..live import events, ns, schedule, transit, weather
 
 
 class _Done(QObject):
@@ -25,11 +25,14 @@ class LiveTab(QWidget):
         self._done = _Done()
         self._done.finished.connect(lambda cb, res: cb(res))
         self._stops: list[transit.Stop] | None = None
+        ns.set_api_key(window.settings.api_keys.get("ns", ""))
         lay = QVBoxLayout(self)
         lay.addWidget(self._weather_box())
         lay.addWidget(self._transit_box())
+        lay.addWidget(self._events_box())
         credit = QLabel("Weather data by <a href='https://open-meteo.com/'>Open-Meteo.com</a> (CC BY 4.0) · "
-                        "departures by <a href='https://ovapi.nl/'>OVapi</a>")
+                        "departures by <a href='https://ovapi.nl/'>OVapi</a> and "
+                        "<a href='https://apiportal.ns.nl/'>NS</a>")
         credit.setOpenExternalLinks(True)
         lay.addWidget(credit)
         lay.addStretch()
@@ -109,9 +112,11 @@ class LiveTab(QWidget):
         self.lang.addItems(["nl", "en"])
         self.show_place = QLineEdit(placeholderText="Label (optional)")
         self.w_speed = self._speed_combo()
+        self.w_layout = self._layout_combo()
         opts.addWidget(self.days)
         opts.addWidget(self.lang)
         opts.addWidget(self.w_speed)
+        opts.addWidget(self.w_layout)
         opts.addWidget(self.show_place)
         form.addRow("Show", self._wrap(opts))
         form.addRow(self._wrap(self._actions(self._weather_entry)))
@@ -154,13 +159,25 @@ class LiveTab(QWidget):
                 "steps": [["weather", {"latitude": place.latitude, "longitude": place.longitude,
                                        "label": label, "forecast_days": self.days.value(),
                                        "lang": self.lang.currentText(),
-                                       "speed": self.w_speed.currentData()}]]}
+                                       "speed": self.w_speed.currentData(),
+                                       "layout": self.w_layout.currentData()}]]}
 
     # --- transit -----------------------------------------------------------------------
 
     def _transit_box(self) -> QGroupBox:
-        box = QGroupBox("Public transport departures (Netherlands – bus, tram, metro, ferry)")
+        box = QGroupBox("Public transport departures (Netherlands)")
         form = QFormLayout(box)
+        src = QHBoxLayout()
+        self.t_source = QComboBox()
+        self.t_source.addItem("Bus, tram, metro, ferry (OVapi)", "ovapi")
+        self.t_source.addItem("Trains with platforms (NS – needs a free API key)", "ns")
+        self.t_source.currentIndexChanged.connect(lambda *_: self.stop_list.clear())
+        self.ns_key = QLineEdit(self.window.settings.api_keys.get("ns", ""), echoMode=QLineEdit.Password,
+                                placeholderText="NS API key (apiportal.ns.nl → Ns-App)")
+        self.ns_key.editingFinished.connect(self._save_ns_key)
+        src.addWidget(self.t_source)
+        src.addWidget(self.ns_key)
+        form.addRow("Source", self._wrap(src))
         row = QHBoxLayout()
         self.stop_q = QLineEdit(placeholderText="Stop name and/or town, e.g. Vaartsche Rijn Utrecht")
         self.stop_q.returnPressed.connect(self._find_stop)
@@ -177,9 +194,11 @@ class LiveTab(QWidget):
         self.count = QSpinBox(minimum=1, maximum=8, value=3, suffix=" departures")
         self.stop_label = QLineEdit(placeholderText="Label (optional)")
         self.t_speed = self._speed_combo()
+        self.t_layout = self._layout_combo()
         opts.addWidget(self.lines)
         opts.addWidget(self.count)
         opts.addWidget(self.t_speed)
+        opts.addWidget(self.t_layout)
         opts.addWidget(self.stop_label)
         form.addRow("Show", self._wrap(opts))
         form.addRow(self._wrap(self._actions(self._transit_entry)))
@@ -190,10 +209,16 @@ class LiveTab(QWidget):
         if not q:
             return
         self.stop_list.clear()
-        if self._stops is None:
+        use_ns = self.t_source.currentData() == "ns"
+        if use_ns and not ns.has_key():
+            self.window.log("Enter your NS API key first (free at apiportal.ns.nl).")
+            return
+        if self._stops is None and not use_ns:
             self.stop_list.addItem("Downloading the list of Dutch stops (once)…")
 
         def work():
+            if use_ns:
+                return ns.search_stations(q)
             if self._stops is None:
                 self._stops = transit.load_stops()
             return transit.search_stops(self._stops, q)
@@ -221,7 +246,109 @@ class LiveTab(QWidget):
         return {"name": f"Vertrek {stop.name}", "description": f"Departures from {stop.label()}",
                 "steps": [["transit", {"stop": stop.code, "label": self.stop_label.text().strip(),
                                        "lines": lines, "count": self.count.value(),
-                                       "speed": self.t_speed.currentData()}]]}
+                                       "source": self.t_source.currentData(),
+                                       "speed": self.t_speed.currentData(),
+                                       "layout": self.t_layout.currentData()}]]}
+
+    def _save_ns_key(self) -> None:
+        key = self.ns_key.text().strip()
+        if key == self.window.settings.api_keys.get("ns", ""):
+            return
+        self.window.settings.api_keys["ns"] = key
+        ns.set_api_key(key)
+        self.window.save_settings()
+
+    # --- event schedules ---------------------------------------------------------------
+
+    def _events_box(self) -> QGroupBox:
+        box = QGroupBox("Event schedule (BornHack, eth0, or any frab/pretalx schedule)")
+        form = QFormLayout(box)
+        row = QHBoxLayout()
+        self.event_kind = QComboBox()
+        for name in events.KNOWN:
+            self.event_kind.addItem(name, name)
+        self.event_kind.addItem("Other (schedule.xml URL)", "custom")
+        self.event_kind.currentIndexChanged.connect(self._event_kind_changed)
+        self.editions = QComboBox()
+        self.editions.setMinimumWidth(160)
+        find = QPushButton("Find editions")
+        find.clicked.connect(self._find_editions)
+        row.addWidget(self.event_kind)
+        row.addWidget(self.editions)
+        row.addWidget(find)
+        form.addRow("Event", self._wrap(row))
+        custom = QHBoxLayout()
+        self.event_url = QLineEdit(placeholderText="https://…/schedule.xml")
+        self.event_site = QLineEdit(placeholderText="Website or icon URL (for the icon)")
+        custom.addWidget(self.event_url)
+        custom.addWidget(self.event_site)
+        self.custom_row = self._wrap(custom)
+        self.custom_row.setVisible(False)
+        form.addRow("", self.custom_row)
+        opts = QHBoxLayout()
+        self.rooms = QLineEdit(placeholderText="Only rooms (comma-separated) – empty = all")
+        self.e_count = QSpinBox(minimum=1, maximum=10, value=4, suffix=" talks")
+        self.e_lang = QComboBox()
+        self.e_lang.addItems(["en", "nl"])
+        self.e_speed = self._speed_combo()
+        self.e_layout = self._layout_combo()
+        for w in (self.rooms, self.e_count, self.e_lang, self.e_speed, self.e_layout):
+            opts.addWidget(w)
+        form.addRow("Show", self._wrap(opts))
+        form.addRow(self._wrap(self._actions(self._event_entry)))
+        return box
+
+    def _event_kind_changed(self) -> None:
+        custom = self.event_kind.currentData() == "custom"
+        self.custom_row.setVisible(custom)
+        self.editions.setVisible(not custom)
+        self.editions.clear()
+
+    def _find_editions(self) -> None:
+        kind = self.event_kind.currentData()
+        if kind == "custom":
+            return
+        self.editions.clear()
+        self.editions.addItem("Searching…")
+
+        def done(res):
+            self.editions.clear()
+            if isinstance(res, Exception):
+                self.window.log(f"Could not list {kind} editions: {res}")
+                return
+            for e in res:
+                self.editions.addItem(e.name, e)
+            if not res:
+                self.window.log(f"No {kind} schedules found")
+        self._background(events.KNOWN[kind], done)
+
+    def _event_entry(self) -> dict | None:
+        rooms = [x.strip() for x in self.rooms.text().split(",") if x.strip()]
+        if self.event_kind.currentData() == "custom":
+            url = self.event_url.text().strip()
+            if not url:
+                self.window.log("Paste the event's schedule.xml URL first.")
+                return None
+            name, icon = url.split("/")[2] if "//" in url else url, self.event_site.text().strip()
+        else:
+            ed = self.editions.currentData()
+            if not isinstance(ed, events.Edition):
+                self.window.log("Click “Find editions” and pick one first.")
+                return None
+            url, name, icon = ed.schedule_url, ed.name, ed.icon_url
+        return {"name": f"Schedule {name}", "description": f"What's on at {name}",
+                "steps": [["schedule", {"url": url, "icon": icon, "label": "" if self.event_kind.currentData()
+                                        == "custom" else name, "rooms": rooms, "count": self.e_count.value(),
+                                        "lang": self.e_lang.currentText(), "speed": self.e_speed.currentData(),
+                                        "layout": self.e_layout.currentData()}]]}
+
+    @staticmethod
+    def _layout_combo() -> QComboBox:
+        combo = QComboBox()
+        combo.setToolTip("Auto: one scrolling line on 16-pixel-high displays, rows on taller ones")
+        for label, key in (("Auto layout", "auto"), ("One line", "line"), ("Rows", "rows")):
+            combo.addItem(label, key)
+        return combo
 
     @staticmethod
     def _speed_combo() -> QComboBox:

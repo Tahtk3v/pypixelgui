@@ -1,0 +1,620 @@
+<?xml version='1.0' encoding='utf-8' ?>
+<schedule>
+<generator name='frab' version='0.7'></generator>
+<version>1.0</version>
+<conference>
+<acronym>eth0_2026</acronym>
+<title>eth0:2026</title>
+<start>2026-11-06</start>
+<end>2026-11-08</end>
+<days>3</days>
+<timeslot_duration>00:15</timeslot_duration>
+<time_zone_name>Europe/Amsterdam</time_zone_name>
+<base_url>https://content.eth0.nl</base_url>
+</conference>
+<day date='2026-11-06' end='2026-11-07T02:00:00+01:00' index='1' start='2026-11-06T18:00:00+01:00'>
+<room guid='21a01f48-4544-54fa-9b1a-8a081309d1a6' name='Hackcentre Nolleken'>
+</room>
+<room guid='65935a6b-0de4-5512-b8dd-79de5c150bb9' name='Hackcentre Houtbroek'>
+<event guid='b649f0a1-e104-4360-8f07-3f3ce2709556' id='22'>
+<date>2026-11-06T21:00:00+01:00</date>
+<start>21:00</start>
+<duration>01:00</duration>
+<room>Hackcentre Houtbroek</room>
+<slug>eth0_2026-22-opening</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/22</url>
+<recording>
+<license></license>
+<optout>true</optout>
+</recording>
+<title>opening</title>
+<subtitle></subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract></abstract>
+<description></description>
+<logo></logo>
+<persons>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='d9d6042d-6dc0-4815-9aad-c70b5a787b9e' id='25'>
+<date>2026-11-06T22:00:00+01:00</date>
+<start>22:00</start>
+<duration>02:00</duration>
+<room>Hackcentre Houtbroek</room>
+<slug>eth0_2026-25-party_hacking</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/25</url>
+<recording>
+<license></license>
+<optout>true</optout>
+</recording>
+<title>party hacking</title>
+<subtitle>party hacking</subtitle>
+<track>food</track>
+<type></type>
+<language>en</language>
+<abstract>Hackcentre houtbroek is our sound isolated hackcentre so music is allowed here</abstract>
+<description></description>
+<logo></logo>
+<persons>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+</room>
+<room guid='2356df9d-8ee4-5cda-a969-ea6c983ba5e9' name='Talks Room 2.25'>
+</room>
+<room guid='75744b48-4079-58b1-8864-ce8610a5073e' name='Bar/Lounge'>
+<event guid='a7591147-2fd4-43c9-aae7-1b75419316c3' id='13'>
+<date>2026-11-06T19:00:00+01:00</date>
+<start>19:00</start>
+<duration>02:00</duration>
+<room>Bar/Lounge</room>
+<slug>eth0_2026-13-friday_dinner</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/13</url>
+<recording>
+<license></license>
+<optout>true</optout>
+</recording>
+<title>friday dinner</title>
+<subtitle>friday dinner</subtitle>
+<track>food</track>
+<type></type>
+<language>en</language>
+<abstract>Hamburger with baked rosemary potatoes
+
+Depending on your dietary restrictions you can customise your hamburger, however all food will be produced in the same kitchen so we cannot guarantee that food is free of traces of allergens.</abstract>
+<description></description>
+<logo></logo>
+<persons>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+</room>
+</day>
+<day date='2026-11-07' end='2026-11-08T02:00:00+01:00' index='2' start='2026-11-07T09:00:00+01:00'>
+<room guid='21a01f48-4544-54fa-9b1a-8a081309d1a6' name='Hackcentre Nolleken'>
+</room>
+<room guid='65935a6b-0de4-5512-b8dd-79de5c150bb9' name='Hackcentre Houtbroek'>
+<event guid='417e2f65-335a-4fcd-96f9-cb6dc18cbc26' id='5'>
+<date>2026-11-07T21:00:00+01:00</date>
+<start>21:00</start>
+<duration>00:15</duration>
+<room>Hackcentre Houtbroek</room>
+<slug>eth0_2026-5-hacker_jeopardy_buttons_debugging_session_live_on_stage</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/5</url>
+<recording>
+<license></license>
+<optout>true</optout>
+</recording>
+<title>Hacker Jeopardy buttons debugging session live on stage</title>
+<subtitle></subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract>We got to make sure the buttons work this time.</abstract>
+<description></description>
+<logo></logo>
+<persons>
+<person id='13'>Eloy</person>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='e3b6d369-ea9f-4872-9bed-b1e78268b0a9' id='4'>
+<date>2026-11-07T21:15:00+01:00</date>
+<start>21:15</start>
+<duration>01:45</duration>
+<room>Hackcentre Houtbroek</room>
+<slug>eth0_2026-4-hacker_jeopardy</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/4</url>
+<recording>
+<license></license>
+<optout>true</optout>
+</recording>
+<title>Hacker Jeopardy</title>
+<subtitle>Working™ buttons edition</subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract>The classic Jeopardy! with hacker subjects</abstract>
+<description></description>
+<logo></logo>
+<persons>
+<person id='13'>Eloy</person>
+<person id='4'>Steph0x00</person>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='01e975fb-4b1b-4ee3-8d11-3f78de3274a2' id='26'>
+<date>2026-11-07T23:00:00+01:00</date>
+<start>23:00</start>
+<duration>01:00</duration>
+<room>Hackcentre Houtbroek</room>
+<slug>eth0_2026-26-party_hacking</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/26</url>
+<recording>
+<license></license>
+<optout>true</optout>
+</recording>
+<title>party hacking</title>
+<subtitle>party hacking</subtitle>
+<track>food</track>
+<type></type>
+<language>nl</language>
+<abstract>Hackcentre houtbroek is our sound isolated hackcentre so music is allowed here</abstract>
+<description></description>
+<logo></logo>
+<persons>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+</room>
+<room guid='2356df9d-8ee4-5cda-a969-ea6c983ba5e9' name='Talks Room 2.25'>
+<event guid='47078240-5bdd-40f8-97bf-8dde4c70b174' id='19'>
+<date>2026-11-07T12:00:00+01:00</date>
+<start>12:00</start>
+<duration>00:45</duration>
+<room>Talks Room 2.25</room>
+<slug>eth0_2026-19-creating_the_ugly_shirt</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/19</url>
+<recording>
+<license>CC-BY 4.0</license>
+<optout>false</optout>
+</recording>
+<title>Creating the &#39;ugly shirt&#39;</title>
+<subtitle>Or how I misunderstood &#39;Zero History&#39;</subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract>How I created the &#39;ugly shirt&#39; from the book &#39;don&#39;t create the ugly shirt&#39; (Zero History). </abstract>
+<description>Some fun research based upon my misunderstanding of the ugly shirt as described by William Gibson in Zero History. Multiple iterations of &#39;an&#39; ugly shirt already exist, as is the research into counter surveillance very wide, with both facial recognition disruption, counter illumination and so on. But what if we take this idea a bit further into the realm of &#39;global conspiracy&#39;. Which would also be fitting for a Gibson novel.</description>
+<logo></logo>
+<persons>
+<person id='27'>Muse</person>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='8911e94e-a177-408e-bc8a-4ea3b9053350' id='20'>
+<date>2026-11-07T13:00:00+01:00</date>
+<start>13:00</start>
+<duration>00:15</duration>
+<room>Talks Room 2.25</room>
+<slug>eth0_2026-20-streaming_linux_isos_to_friends_for_fun_and_not_profit</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/20</url>
+<recording>
+<license>CC-BY 4.0</license>
+<optout>true</optout>
+</recording>
+<title>Streaming Linux ISOs to Friends for Fun and NOT Profit</title>
+<subtitle>A brief overview of my private streaming setup.</subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract>A review of my private streaming setup including the front-end software called Railgun, the backend video encoding called Oven Media Encoder, the resources it requires, the methods of use, the reasons, and maybe a diagram of the architecture.</abstract>
+<description></description>
+<logo></logo>
+<persons>
+<person id='28'>Baa</person>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='89e623e6-a5cf-4e29-a131-0e8e8bf239ec' id='8'>
+<date>2026-11-07T14:00:00+01:00</date>
+<start>14:00</start>
+<duration>00:45</duration>
+<room>Talks Room 2.25</room>
+<slug>eth0_2026-8-passwords_-_facts_and_fables</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/8</url>
+<recording>
+<license>CC-BY 4.0</license>
+<optout>false</optout>
+</recording>
+<title>Passwords - Facts and fables</title>
+<subtitle></subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract>Facts and fables about passwords</abstract>
+<description>A brief history of passwords, authentication mechanisms, biometrics, password strengths and some practices (best and worse). Subjects like Duress passwords, plausible deniability and what the law has to say about this are discussed as well. Previous talks: Network Hacking 101/201/301, and RFC1925-Festival Edition. There will be memes!</description>
+<logo>/system/events/logos/000/000/008/large/passwords.png?1786452481</logo>
+<persons>
+<person id='22'>BS</person>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='66014ee2-182f-4db3-9de7-b32906c0b901' id='10'>
+<date>2026-11-07T15:00:00+01:00</date>
+<start>15:00</start>
+<duration>00:45</duration>
+<room>Talks Room 2.25</room>
+<slug>eth0_2026-10-how-to_poc_at_home</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/10</url>
+<recording>
+<license>CC-BY 4.0</license>
+<optout>false</optout>
+</recording>
+<title>How-to POC at home</title>
+<subtitle>Constructing a landline with the power of Linux</subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract>A dive into internet telephony, the tech that makes it all work, and the stuff used to run real-world telephone networks at events like CCC and EMF.</abstract>
+<description></description>
+<logo></logo>
+<persons>
+<person id='25'>Nightshade</person>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='30caf273-bd72-4a83-ac3f-13993659f3b0' id='7'>
+<date>2026-11-07T16:00:00+01:00</date>
+<start>16:00</start>
+<duration>00:45</duration>
+<room>Talks Room 2.25</room>
+<slug>eth0_2026-7-uxn</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/7</url>
+<recording>
+<license>CC-BY 4.0</license>
+<optout>false</optout>
+</recording>
+<title>Uxn</title>
+<subtitle>small computing</subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract></abstract>
+<description>You might wonder how small you can go still have an interactive and self-hosted computing system, or what happens when you don&#39;t have an internet connection for months. Uxn is one attempt to answer these questions. It is a computing stack developed by Rek Bella and Devine Lu Linvega (collectively Hundred Rabbits), who travel around the world on their sailboat. I haven&#39;t sailed in about 20 years, but I find these solarpunk perspectives interesting.
+
+Uxn is stack-based processor, usually implemented as an emulator running on whatever hardware is available.
+Uxntal is programming language, somewhere between Assembly and Forth.
+Varvara is the set of peripherals usually attached to an Uxn processor.
+I made my own, slightly different thing based on a Raspberry Pi Pico / RP2040.</description>
+<logo></logo>
+<persons>
+<person id='17'>jn</person>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='2e7bd6ce-9883-40be-9685-b629beb7bc62' id='9'>
+<date>2026-11-07T17:00:00+01:00</date>
+<start>17:00</start>
+<duration>00:45</duration>
+<room>Talks Room 2.25</room>
+<slug>eth0_2026-9-uefi_what_s_so_unified_about_it</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/9</url>
+<recording>
+<license>CC-BY 4.0</license>
+<optout>false</optout>
+</recording>
+<title>UEFI: What&#39;s So Unified About It?</title>
+<subtitle></subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract>An introduction to how UEFI works and what it is that makes it &quot;unified&quot;, how to discover things in areas you have no clue about through practice, and a case study of this via a bootloader I wrote from scratch with no prior domain-specific knowledge.</abstract>
+<description></description>
+<logo></logo>
+<persons>
+<person id='24'>Chloé &quot;toast&quot; VULQUIN</person>
+</persons>
+<links>
+<link href='https://git.toast.cafe/~toast/tub/'>tub source code</link>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='92293bba-4e06-4658-a7cf-5bc3bd5894f9' id='18'>
+<date>2026-11-07T18:00:00+01:00</date>
+<start>18:00</start>
+<duration>00:45</duration>
+<room>Talks Room 2.25</room>
+<slug>eth0_2026-18-modal_logic_for_fun_and_non-profit</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/18</url>
+<recording>
+<license>CC-BY 4.0</license>
+<optout>false</optout>
+</recording>
+<title>Modal logic for fun and non-profit</title>
+<subtitle></subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract>A talk explaining the basics of formal logic and describing various technical and non-technical applications. Focusing specifically on modal logic, because it&#39;s very useful and deserves more attention in my opinion!</abstract>
+<description>Formal logic is cool because it can be applied not just to technical topics like mathematics or programming, but really any topic where &quot;reasoning&quot; is involved. Typically, a basic course in logic will teach you about propositional logic as a basis, and then move on to predicate logic as a more powerful tool. But in between those two forms of logic exists a third in terms of expressivity: modal logic, which allows talking about the *ways* in which statements might be true or false. This makes modal logic useful to analyze individual programs or distributed systems, but also fun stuff like board game strategies. And because modal logic is still simpler than predicate logic, it is easier to work with and in many cases even allows for algorithmic checking - which also powers formal verification tools like TLA+ and Alloy.
+
+This talk should be accessible for those without any background in formal logic - I will go over the basics before diving deeper into modal logic. All you&#39;ll need is some familiarity with programming and a willingness to look at weird maths symbols. :&gt;</description>
+<logo></logo>
+<persons>
+<person id='23'>entailment</person>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+</room>
+<room guid='75744b48-4079-58b1-8864-ce8610a5073e' name='Bar/Lounge'>
+<event guid='c2a43a97-c235-4056-9970-2c8eb355706f' id='11'>
+<date>2026-11-07T09:00:00+01:00</date>
+<start>09:00</start>
+<duration>05:00</duration>
+<room>Bar/Lounge</room>
+<slug>eth0_2026-11-saturday_brunch</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/11</url>
+<recording>
+<license></license>
+<optout>true</optout>
+</recording>
+<title>saturday brunch</title>
+<subtitle>saturday brunch</subtitle>
+<track>food</track>
+<type></type>
+<language>en</language>
+<abstract></abstract>
+<description></description>
+<logo></logo>
+<persons>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='6528fba1-1fcc-4b50-9f95-88330ced5400' id='24'>
+<date>2026-11-07T17:30:00+01:00</date>
+<start>17:30</start>
+<duration>01:00</duration>
+<room>Bar/Lounge</room>
+<slug>eth0_2026-24-merch_handout</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/24</url>
+<recording>
+<license></license>
+<optout>true</optout>
+</recording>
+<title>Merch handout</title>
+<subtitle>Merch handout</subtitle>
+<track>food</track>
+<type></type>
+<language>en</language>
+<abstract>Come pickup your pre-ordered merch! Make sure you have your pretix ticket handy. Merch is pre-order only.</abstract>
+<description></description>
+<logo></logo>
+<persons>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='9f35b8ae-065b-4a29-ad53-c9a06af27068' id='14'>
+<date>2026-11-07T19:00:00+01:00</date>
+<start>19:00</start>
+<duration>02:00</duration>
+<room>Bar/Lounge</room>
+<slug>eth0_2026-14-saturday_dinner</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/14</url>
+<recording>
+<license></license>
+<optout>true</optout>
+</recording>
+<title>saturday dinner</title>
+<subtitle>saturday dinner</subtitle>
+<track>food</track>
+<type></type>
+<language>nl</language>
+<abstract>Lasagna bolognese with bechamel and a salad (vegan option available)
+Allergen free version: Pasta vendura with a salad (allium, gluten, soy free etc)
+
+We have options for all dietary restrictions and preferences submitted, however all food will be produced in the same kitchen so we cannot guarantee that food is free of traces of allergens.</abstract>
+<description></description>
+<logo></logo>
+<persons>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+</room>
+</day>
+<day date='2026-11-08' end='2026-11-08T16:00:00+01:00' index='3' start='2026-11-08T09:00:00+01:00'>
+<room guid='21a01f48-4544-54fa-9b1a-8a081309d1a6' name='Hackcentre Nolleken'>
+</room>
+<room guid='65935a6b-0de4-5512-b8dd-79de5c150bb9' name='Hackcentre Houtbroek'>
+<event guid='d78ca524-b625-4803-aa4c-8ad788f3ce07' id='23'>
+<date>2026-11-08T15:30:00+01:00</date>
+<start>15:30</start>
+<duration>00:30</duration>
+<room>Hackcentre Houtbroek</room>
+<slug>eth0_2026-23-closing</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/23</url>
+<recording>
+<license></license>
+<optout>true</optout>
+</recording>
+<title>closing</title>
+<subtitle></subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract></abstract>
+<description></description>
+<logo></logo>
+<persons>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+</room>
+<room guid='2356df9d-8ee4-5cda-a969-ea6c983ba5e9' name='Talks Room 2.25'>
+<event guid='b3650ad4-caf9-48e9-837b-4b75707459de' id='21'>
+<date>2026-11-08T12:00:00+01:00</date>
+<start>12:00</start>
+<duration>00:45</duration>
+<room>Talks Room 2.25</room>
+<slug>eth0_2026-21-fpv_drone_ecosystem</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/21</url>
+<recording>
+<license></license>
+<optout>false</optout>
+</recording>
+<title>FPV Drone Ecosystem</title>
+<subtitle></subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract>Drones and especially FPV drones are a big topic in current day and age. Let&#39;s look a little at how they work, what the experience of flying one is like and explore the wealth of FOSS projects powering them.</abstract>
+<description>I&#39;ll be talking about the basic components of an FPV drone, exploring the history a little bit and delving into projects such as Betaflight, ELRS, Bluejayz and AM32. I will also provide some tips for people looking to get into the FPV hobby.</description>
+<logo></logo>
+<persons>
+<person id='29'>Karen</person>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='6a987b4c-9bca-4d58-96f3-89f14e142dc4' id='6'>
+<date>2026-11-08T13:00:00+01:00</date>
+<start>13:00</start>
+<duration>00:45</duration>
+<room>Talks Room 2.25</room>
+<slug>eth0_2026-6-how_to_start_anything_--_from_small_projects_to_hackerspaces_to_huge_events_--_when_you_have_only_the_foggiest_of_ideas</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/6</url>
+<recording>
+<license>CC-BY 4.0</license>
+<optout>false</optout>
+</recording>
+<title>How to start anything -- from small projects to hackerspaces to huge events -- when you have only the foggiest of ideas</title>
+<subtitle></subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract>Do you want to do a thing? With software, some tools, electronics, a group of people. Or even something bigger, like a hackerspace or an event? Is there nothing close to you and do you want to change that?
+</abstract>
+<description>Join me in exploring how to start small personal projects, and how the same patterns are used in bigger projects like hackerspaces and big hacker camps.</description>
+<logo></logo>
+<persons>
+<person id='16'>boekenwuurm</person>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+<event guid='bd372ef9-6e5e-471f-89f7-62e2ee56e316' id='3'>
+<date>2026-11-08T14:00:00+01:00</date>
+<start>14:00</start>
+<duration>00:45</duration>
+<room>Talks Room 2.25</room>
+<slug>eth0_2026-3-revbank</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/3</url>
+<recording>
+<license>CC-BY 4.0</license>
+<optout>true</optout>
+</recording>
+<title>RevBank</title>
+<subtitle>The software behind paying for Mate at eth0 and many hackerspaces</subtitle>
+<track>talks</track>
+<type>lecture</type>
+<language>en</language>
+<abstract>Hundreds of people put their money into this insecure thing and that&#39;s ok.</abstract>
+<description>An overview of the UX and internals.</description>
+<logo></logo>
+<persons>
+<person id='12'>Juerd</person>
+</persons>
+<links>
+<link href='https://revbank.nl/'>RevBank</link>
+<link href='https://codeberg.org/revspace/revbank'>Source</link>
+</links>
+<attachments>
+</attachments>
+</event>
+</room>
+<room guid='75744b48-4079-58b1-8864-ce8610a5073e' name='Bar/Lounge'>
+<event guid='f2d06186-baeb-4517-87a7-594252e0f245' id='12'>
+<date>2026-11-08T09:00:00+01:00</date>
+<start>09:00</start>
+<duration>05:00</duration>
+<room>Bar/Lounge</room>
+<slug>eth0_2026-12-sunday_brunch</slug>
+<url>https://content.eth0.nl/en/eth0_2026/public/events/12</url>
+<recording>
+<license></license>
+<optout>true</optout>
+</recording>
+<title>sunday brunch</title>
+<subtitle>sunday brunch</subtitle>
+<track>food</track>
+<type></type>
+<language>en</language>
+<abstract></abstract>
+<description></description>
+<logo></logo>
+<persons>
+</persons>
+<links>
+</links>
+<attachments>
+</attachments>
+</event>
+</room>
+</day>
+</schedule>

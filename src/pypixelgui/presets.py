@@ -183,9 +183,12 @@ def user_preset(entry: dict) -> Preset:
         image = _file_thumbnail(steps[0][1].get("file", ""))
     if steps and steps[0][0] in LIVE_KINDS:
         kind, params = steps[0]
+        thumb = LIVE_KINDS[kind]
+        if kind == "schedule" and params.get("icon"):
+            thumb = _event_thumb(params["icon"], thumb)
         return Preset(entry["name"], "My presets", entry.get("description", "Live"),
                       lambda w, h: [live_step(kind, params, w, h)], tuple(entry.get("swatch", ())),
-                      image=LIVE_KINDS[kind])
+                      image=thumb)
     return Preset(entry["name"], "My presets", entry.get("description", "Saved preset"),
                   lambda _w, _h: [(c, dict(p)) for c, p in steps], tuple(entry.get("swatch", ())),
                   image=image)
@@ -232,12 +235,37 @@ def _transit_thumb(w: int, h: int) -> Image.Image:
     return im
 
 
-LIVE_KINDS = {"weather": _weather_thumb, "transit": _transit_thumb}
+def _schedule_thumb(w: int, h: int) -> Image.Image:
+    im = Image.new("RGB", (w, h))
+    d = ImageDraw.Draw(im)
+    d.rectangle([w * 0.2, h * 0.15, w * 0.8, h * 0.9], fill=(230, 230, 230))
+    d.rectangle([w * 0.2, h * 0.15, w * 0.8, h * 0.35], fill=(255, 170, 0))
+    for y in (0.5, 0.65, 0.8):
+        d.line([w * 0.3, h * y, w * 0.7, h * y], fill=(60, 60, 60))
+    return im
 
 
-def _speed(params: dict) -> float:
-    v = params.get("speed", "normal")
-    return float(render.SCROLL_SPEEDS.get(v, v)) if v else render.SCROLL_SPEEDS["normal"]
+LIVE_KINDS = {"weather": _weather_thumb, "transit": _transit_thumb, "schedule": _schedule_thumb}
+
+
+def _event_thumb(spec: str, fallback):
+    """The event's own icon as the preset button picture (cached; no network if cached)."""
+    def draw(w: int, h: int) -> Image.Image:
+        from .live import events
+        icon = events.icon(spec)
+        if icon is None:
+            return fallback(w, h)
+        im = Image.new("RGB", (w, h))
+        icon = icon.copy()
+        icon.thumbnail((w, h))
+        im.paste(icon, ((w - icon.width) // 2, (h - icon.height) // 2), icon)
+        return im
+    return draw
+
+
+def _speed(params: dict):
+    """Scroll speed name ("slow"/"normal"/"fast") or characters per second."""
+    return params.get("speed") or "normal"
 
 
 def live_step(kind: str, params: dict, width: int, height: int) -> Step:
@@ -248,12 +276,24 @@ def live_step(kind: str, params: dict, width: int, height: int) -> Step:
                              int(params.get("forecast_days", 2)))
         frames = weather.frames(data, width, height, params.get("label", ""),
                                 int(params.get("forecast_days", 2)), params.get("lang", "nl"),
-                                speed=_speed(params))
+                                speed=_speed(params), layout=params.get("layout", "auto"))
     elif kind == "transit":
         from .live import transit
-        deps = transit.fetch_departures(params["stop"], lines=params.get("lines") or None)
+        if params.get("source") == "ns":
+            from .live import ns
+            deps = ns.fetch_departures(params["stop"], lines=params.get("lines") or None)
+        else:
+            deps = transit.fetch_departures(params["stop"], lines=params.get("lines") or None)
         frames = transit.frames(deps, width, height, params.get("label", ""),
-                                int(params.get("count", 3)), speed=_speed(params))
+                                int(params.get("count", 3)), speed=_speed(params),
+                                layout=params.get("layout", "auto"))
+    elif kind == "schedule":
+        from .live import events, schedule
+        sched = schedule.fetch(params["url"])
+        frames = schedule.frames(sched, width, height, count=int(params.get("count", 4)),
+                                 rooms=params.get("rooms") or None, icon=events.icon(params.get("icon", "")),
+                                 label=params.get("label", ""), lang=params.get("lang", "en"),
+                                 speed=_speed(params), layout=params.get("layout", "auto"))
     else:
         raise ValueError(f"unknown live preset {kind!r}")
     if len(frames) == 1:

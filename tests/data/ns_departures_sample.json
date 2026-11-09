@@ -1,0 +1,6 @@
+{"payload": {"source": "PPV", "departures": [
+  {"direction": "Den Haag Centraal", "name": "NS  3041", "plannedDateTime": "2026-11-09T13:40:00+0100", "actualDateTime": "2026-11-09T13:42:00+0100", "plannedTrack": "5", "actualTrack": "5b", "product": {"number": "3041", "categoryCode": "IC", "shortCategoryName": "NS Intercity", "longCategoryName": "Intercity", "operatorName": "NS"}, "trainCategory": "IC", "cancelled": false, "departureStatus": "INCOMING"},
+  {"direction": "Amersfoort Centraal", "name": "NS  7441", "plannedDateTime": "2026-11-09T13:36:00+0100", "actualDateTime": "2026-11-09T13:36:00+0100", "plannedTrack": "12", "actualTrack": "12", "product": {"number": "7441", "categoryCode": "SPR", "shortCategoryName": "NS Sprinter", "operatorName": "NS"}, "trainCategory": "SPR", "cancelled": false, "departureStatus": "ON_STATION"},
+  {"direction": "Zwolle", "name": "NS  2741", "plannedDateTime": "2026-11-09T13:30:00+0100", "actualDateTime": "2026-11-09T13:31:00+0100", "plannedTrack": "18", "product": {"number": "2741", "categoryCode": "IC"}, "cancelled": false, "departureStatus": "DEPARTED"},
+  {"direction": "Schiphol Airport", "name": "NS  1234", "plannedDateTime": "2026-11-09T13:50:00+0100", "plannedTrack": "7", "product": {"number": "1234", "categoryCode": "IC"}, "cancelled": true, "departureStatus": "INCOMING"}
+]}}

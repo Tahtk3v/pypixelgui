@@ -71,6 +71,8 @@ class Settings:
     known_devices_only: bool = False
     #: Appearance: "system", "light" or "dark".
     theme: str = "system"
+    #: Keys for optional services, e.g. {"ns": "..."} (stored in plain text).
+    api_keys: dict = field(default_factory=dict)
 
     def find(self, address: str) -> DeviceEntry | None:
         return next((d for d in self.devices if d.address.lower() == address.lower()), None)
@@ -114,6 +116,7 @@ class Settings:
             plugins=dict(raw.get("plugins", {})),
             known_devices_only=bool(raw.get("known_devices_only", False)),
             theme=str(raw.get("theme", "system")),
+            api_keys=dict(raw.get("api_keys", {})),
         )
 
     def save(self, path: Path | None = None) -> Path:

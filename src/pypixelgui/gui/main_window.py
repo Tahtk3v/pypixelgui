@@ -94,7 +94,9 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_text_tab(), "Text")
         from .live_tab import LiveTab
         self.live_tab = LiveTab(self)
-        self.tabs.addTab(self.live_tab, "Live")
+        live_scroll = QScrollArea(widgetResizable=True)
+        live_scroll.setWidget(self.live_tab)
+        self.tabs.addTab(live_scroll, "Live")
         self.tabs.addTab(self._build_image_tab(), "Image")
         self.tabs.addTab(self._build_clock_tab(), "Clock")
         self.tabs.addTab(self._build_display_tab(), "Display")

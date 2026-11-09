@@ -50,6 +50,9 @@ class Departure:
     planned: datetime
     transport: str = "BUS"
     cancelled: bool = False
+    #: Platform / track ("5b", "C"), when the data has it.
+    platform: str = ""
+    platform_changed: bool = False
 
     @property
     def delay_min(self) -> int:
@@ -103,6 +106,19 @@ def fetch_departures(stop_code: str, lines: list[str] | None = None, now: dateti
     return parse_departures(data, lines, now)
 
 
+_PLATFORM_KEYS = ("PlatformCode", "Platform", "SideCode", "StopSideCode")
+
+
+def _platform(passing: dict, stop: dict) -> str:
+    """Platform letter/number if OVapi has one for this stop (bus stations often do)."""
+    for source in (passing, stop):
+        for key in _PLATFORM_KEYS:
+            v = str(source.get(key) or "").strip()
+            if v and v not in ("-", "0", "?"):
+                return v
+    return ""
+
+
 def _time(value: str) -> datetime:
     return datetime.fromisoformat(value).replace(tzinfo=TZ)
 
@@ -128,7 +144,8 @@ def parse_departures(data: dict, lines: list[str] | None = None, now: datetime |
                 dep = Departure(line, p.get("DestinationName50") or p.get("DestinationName16") or "",
                                 _time(p["ExpectedDepartureTime"]),
                                 _time(p.get("TargetDepartureTime") or p["ExpectedDepartureTime"]),
-                                p.get("TransportType", "BUS"), status == "CANCEL")
+                                p.get("TransportType", "BUS"), status == "CANCEL",
+                                _platform(p, (tp or {}).get("Stop") or {}))
                 if dep.expected < now.replace(second=0, microsecond=0):
                     continue
                 key = (dep.line, dep.destination, dep.planned)  # one trip seen at two platforms
@@ -180,10 +197,29 @@ def _short(text: str, n: int = 18) -> str:
     return text if len(text) <= n else text[: n - 1] + "…"
 
 
+def _minutes_segs(d: Departure, now: datetime, height: int, size: int) -> list[Image.Image]:
+    if d.cancelled:
+        return [render.text_segment("vervalt", "ff3333", height, size)]
+    mins = d.minutes(now)
+    out = [render.text_segment("nu" if mins == 0 else f"{mins}'", "55ff55" if mins <= 1 else "ffdd55",
+                               height, size)]
+    if d.delay_min >= 2:
+        out.append(render.text_segment(f"+{d.delay_min}", "ff8833", height, size))
+    return out
+
+
+def _platform_seg(d: Departure, height: int, size: int) -> list[Image.Image]:
+    if not d.platform:
+        return []
+    # changed platform in yellow-on-black like station boards, otherwise grey
+    fg, bg = ("000000", "ffdd00") if d.platform_changed else ("ffffff", "555555")
+    return [render.badge(d.platform, fg, bg, height, size, pad=1)]
+
+
 def segments(deps: list[Departure], height: int, label: str = "", count: int = 3,
-             now: datetime | None = None) -> list[Image.Image]:
+             now: datetime | None = None, size: int | None = None) -> list[Image.Image]:
     now = now or datetime.now(TZ)
-    size = render.segment_font_size(height)
+    size = size or render.segment_font_size(height)
     segs: list[Image.Image] = []
     if label:
         segs.append(render.text_segment(label, "aaaaaa", height, size))
@@ -195,17 +231,44 @@ def segments(deps: list[Departure], height: int, label: str = "", count: int = 3
         segs.append(transport_icon(d.transport, min(height, size)))
         segs.append(render.badge(d.line, fg, bg, height, size))
         segs.append(render.text_segment(_short(d.destination), "ffffff", height, size))
-        if d.cancelled:
-            segs.append(render.text_segment("vervalt", "ff3333", height, size))
-            continue
-        mins = d.minutes(now)
-        segs.append(render.text_segment("nu" if mins == 0 else f"{mins}'", "55ff55" if mins <= 1 else "ffdd55",
-                                        height, size))
-        if d.delay_min >= 2:
-            segs.append(render.text_segment(f"+{d.delay_min}", "ff8833", height, size))
+        if d.platform:
+            segs.append(render.text_segment("spoor" if d.transport == "TRAIN" else "perron", "888888",
+                                            height, size))
+            segs.extend(_platform_seg(d, height, size))
+        segs.extend(_minutes_segs(d, now, height, size))
     return segs
 
 
+WIDE = 128  # panels at least this wide get one row per departure
+
+
+def items(deps: list[Departure], width: int, label: str = "", count: int = 8,
+          now: datetime | None = None) -> list[list[render.Row]]:
+    """Rows per departure. Wide panels: [icon][line] destination … [platform][min].
+    Narrow panels: two rows – [icon][line] … [min], then destination … [platform]."""
+    now = now or datetime.now(TZ)
+    h = render.ROW_HEIGHT
+    if not deps:
+        return [[render.Row(body=[render.text_segment(label or "geen vertrektijden", "888888", h)])]]
+    out = []
+    for d in deps[:count]:
+        fg, bg = TYPE_COLOURS.get(d.transport, TYPE_COLOURS["BUS"])
+        head = [transport_icon(d.transport, h), render.badge(d.line, fg, bg, h)]
+        dest = [render.text_segment(d.destination, "ffffff", h)]
+        mins = _minutes_segs(d, now, h, h)
+        if width >= WIDE:
+            out.append([render.Row(left=head, body=dest, right=_platform_seg(d, h, h) + mins)])
+        elif d.cancelled:
+            out.append([render.Row(left=head, right=[render.text_segment("--", "ff3333", h)]),
+                        render.Row(body=[render.text_segment(f"{d.destination} vervalt", "ff3333", h)])])
+        else:
+            out.append([render.Row(left=head, right=mins[:1]),
+                        render.Row(body=dest, right=mins[1:] + _platform_seg(d, h, h))])
+    return out
+
+
 def frames(deps: list[Departure], width: int, height: int, label: str = "", count: int = 3,
-           now: datetime | None = None, speed: float = render.SCROLL_SPEEDS["normal"]) -> list[render.Frame]:
-    return render.marquee(segments(deps, height, label, count, now), width, height, gap=5, speed=speed)
+           now: datetime | None = None, speed="normal", layout: str = "auto") -> list[render.Frame]:
+    size = render.font_for(width, height)
+    return render.layout(segments(deps, height, label, count, now, size), items(deps, width, label, count, now),
+                         width, height, layout, speed, size)

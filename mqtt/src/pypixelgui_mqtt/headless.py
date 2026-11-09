@@ -29,6 +29,8 @@ def main(argv: list[str] | None = None) -> int:
 
     ensure_ca_certificates()
     settings = Settings.load(args.config)
+    from pypixelgui.live import ns
+    ns.set_api_key(settings.api_keys.get("ns", ""))
     if not settings.devices:
         ap.error(f"no devices in {args.config}; add one with the GUI first")
 

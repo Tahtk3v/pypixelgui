@@ -167,8 +167,8 @@ def temp_colour(t: float) -> str:
 
 
 def segments(w: Weather, place: str = "", forecast_days: int = 2, lang: str = "nl",
-             height: int = 16) -> list[Image.Image]:
-    size = render.segment_font_size(height)
+             height: int = 16, size: int | None = None) -> list[Image.Image]:
+    size = size or render.segment_font_size(height)
     segs: list[Image.Image] = []
     if place:
         segs.append(render.text_segment(place, "aaaaaa", height, size))
@@ -178,13 +178,37 @@ def segments(w: Weather, place: str = "", forecast_days: int = 2, lang: str = "n
     for day in w.days[1:1 + max(0, forecast_days)]:
         segs.append(render.text_segment(names[day.day.weekday()], "888888", height, size))
         segs.append(icon(day.code, min(height, size)))
-        txt = f"{day.high:.0f}/{day.low:.0f}°"
-        if day.rain_chance is not None and day.rain_chance >= 30:
-            txt += f" {day.rain_chance}%"
-        segs.append(render.text_segment(txt, temp_colour(day.high), height, size))
+        segs.append(render.text_segment(_day_text(day), temp_colour(day.high), height, size))
     return segs
 
 
+def _day_text(day: Day) -> str:
+    txt = f"{day.high:.0f}/{day.low:.0f}°"
+    if day.rain_chance is not None and day.rain_chance >= 30:
+        txt += f" {day.rain_chance}%"
+    return txt
+
+
+def items(w: Weather, width: int, place: str = "", forecast_days: int = 2,
+          lang: str = "nl") -> list[list[render.Row]]:
+    """One row for now (icon, place, temperature) and one per forecast day."""
+    h = render.ROW_HEIGHT
+    narrow = width < 96
+    out = [[render.Row(left=[icon(w.code, h, w.is_day)],
+                       body=[render.text_segment(place or ("nu" if lang == "nl" else "now"), "aaaaaa", h)],
+                       right=[render.text_segment(f"{w.temperature:.0f}°", temp_colour(w.temperature), h)])]]
+    names = DAYS.get(lang, DAYS["en"])
+    for day in w.days[1:1 + max(0, forecast_days)]:
+        temps = f"{day.high:.0f}/{day.low:.0f}" + ("" if narrow else "°")
+        right = [icon(day.code, h), render.text_segment(temps, temp_colour(day.high), h)]
+        if not narrow and day.rain_chance is not None and day.rain_chance >= 30:
+            right.append(render.text_segment(f"{day.rain_chance}%", "66aaff", h))
+        out.append([render.Row(left=[render.text_segment(names[day.day.weekday()], "888888", h)], right=right)])
+    return out
+
+
 def frames(w: Weather, width: int, height: int, place: str = "", forecast_days: int = 2,
-           lang: str = "nl", speed: float = render.SCROLL_SPEEDS["normal"]) -> list[render.Frame]:
-    return render.marquee(segments(w, place, forecast_days, lang, height), width, height, speed=speed)
+           lang: str = "nl", speed="normal", layout: str = "auto") -> list[render.Frame]:
+    size = render.font_for(width, height)
+    return render.layout(segments(w, place, forecast_days, lang, height, size),
+                         items(w, width, place, forecast_days, lang), width, height, layout, speed, size)

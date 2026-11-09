@@ -1,0 +1,518 @@
+<?xml version='1.0' encoding='utf-8'?>
+<schedule>
+  <version>BornHack Frab XML Generator v2.0</version>
+  <conference>
+    <title>BornHack 2026</title>
+    <acronym>2026</acronym>
+    <start>2026-07-15</start>
+    <end>2026-07-22</end>
+    <days>8</days>
+    <timeslot_duration>00:30</timeslot_duration>
+    <base_url>https://bornhack.dk/</base_url>
+  </conference>
+  <day index="1" date="2026-07-15" start="2026-07-15T12:00:00+02:00" end="2026-07-16T00:00:00+02:00">
+    <room name="Bar Area">
+      <event id="2198" guid="17841456-0011-1863-e66c-03a248f64793">
+        <date>2026-07-15T20:00:00+00:00</date>
+        <start>20:00:00</start>
+        <duration>2:00:00</duration>
+        <room>Bar Area</room>
+        <slug>2198-wyhiwyg</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/wyhiwyg/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>WYHIWYG</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Music Act</type>
+        <language>en</language>
+        <abstract>What You Hear Is What You Get,it's mostly me mixing some Happy Hardcore,Techno,T</abstract>
+        <description />
+        <persons>
+          <person id="578">Tahtkev</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+    </room>
+    <room name="Bar Meetup Area" />
+    <room name="External" />
+    <room name="Hardware Hacking Area" />
+    <room name="Online" />
+    <room name="Speakers Tent">
+      <event id="2186" guid="17841420-0012-1845-aebc-b833ddd54aea">
+        <date>2026-07-15T19:00:00+00:00</date>
+        <start>19:00:00</start>
+        <duration>1:00:00</duration>
+        <room>Speakers Tent</room>
+        <slug>2186-hello-world</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/hello-world/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>Hello World!</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Talk</type>
+        <language>en</language>
+        <abstract>The BornHack 2026 team would like to welcome you to this year's BornHack event. </abstract>
+        <description />
+        <persons>
+          <person id="567">BornHack</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+    </room>
+    <room name="Startent at Info Desk">
+      <event id="2187" guid="17841168-0012-2880-29b0-084d339246f5">
+        <date>2026-07-15T12:00:00+00:00</date>
+        <start>12:00:00</start>
+        <duration>1:00:00</duration>
+        <room>Startent at Info Desk</room>
+        <slug>2187-daily-volunteer-meeting</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/daily-volunteer-meeting/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>Daily Volunteer Meeting</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Meetup</type>
+        <language>en</language>
+        <abstract>We want to have a short meeting each day for all available volunteers who aren't</abstract>
+        <description />
+        <persons>
+          <person id="567">BornHack</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+    </room>
+    <room name="Workshop Room" />
+    <room name="NWWC Village in Party Area" />
+    <room name="BornHack Radio 102.8 FM" />
+    <room name="BornHack Radio Studio near Info Desk" />
+    <room name="HSNL Village on Main Camping" />
+  </day>
+  <day index="2" date="2026-07-16" start="2026-07-16T00:00:00+02:00" end="2026-07-17T00:00:00+02:00">
+    <room name="Bar Area">
+      <event id="2421" guid="17841996-0011-1906-dc87-fe3e7f5142a4">
+        <date>2026-07-16T11:00:00+00:00</date>
+        <start>11:00:00</start>
+        <duration>3:00:00</duration>
+        <room>Bar Area</room>
+        <slug>2421-hitching-and-lashing-wooden-structures</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/hitching-and-lashing-wooden-structures/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>Hitching and lashing wooden structures</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Workshop</type>
+        <language>en</language>
+        <abstract>We'll learn the basics of hitching and lashing wooden poles together and possibl</abstract>
+        <description />
+        <persons>
+          <person id="619">Bart</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+      <event id="2410" guid="17842320-0011-1932-c20a-6eb140394b69">
+        <date>2026-07-16T20:00:00+00:00</date>
+        <start>20:00:00</start>
+        <duration>2:00:00</duration>
+        <room>Bar Area</room>
+        <slug>2410-oldies-to-newlies</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/oldies-to-newlies/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>Oldies to newlies</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Music Act</type>
+        <language>en</language>
+        <abstract>Do you miss the good old 90s eurodance and just wanna vibe in a good ol sandstor</abstract>
+        <description />
+        <persons>
+          <person id="633">DJ kyooty</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+    </room>
+    <room name="Bar Meetup Area">
+      <event id="2014" guid="17842068-0011-2890-b675-3208afd64ad8">
+        <date>2026-07-16T13:00:00+00:00</date>
+        <start>13:00:00</start>
+        <duration>1:00:00</duration>
+        <room>Bar Meetup Area</room>
+        <slug>2014-hackers-gotta-eat-job-search-networking</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/hackers-gotta-eat-job-search-networking/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>Hackers Gotta Eat: Job Search Networking</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Meetup</type>
+        <language>en</language>
+        <abstract>Meetup for job search networking and matching, and general professional networki</abstract>
+        <description />
+        <persons>
+          <person id="606">Darin Christiansen Weeks</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+    </room>
+    <room name="External" />
+    <room name="Hardware Hacking Area" />
+    <room name="Online" />
+    <room name="Speakers Tent">
+      <event id="1943" guid="17841996-0012-1847-10be-cbadab724d2e">
+        <date>2026-07-16T11:00:00+00:00</date>
+        <start>11:00:00</start>
+        <duration>1:00:00</duration>
+        <room>Speakers Tent</room>
+        <slug>1943-bornhack-cybergg</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/bornhack-cybergg/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>false</optout>
+        </recording>
+        <title>BornHack CyberÆgg</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Talk</type>
+        <language>en</language>
+        <abstract>The creation of hard and software of the BornHack 2026 CyberÆgg badge.</abstract>
+        <description />
+        <persons>
+          <person id="568">Anne Jan Brouwer</person>
+          <person id="592">Paul Honig</person>
+        </persons>
+        <links>
+          <link href="https://badge.team/docs/badges/bornhack-2026/">Project</link>
+        </links>
+        <attachments />
+      </event>
+      <event id="1938" guid="17842032-0012-1891-6963-181035ed4d2b">
+        <date>2026-07-16T12:00:00+00:00</date>
+        <start>12:00:00</start>
+        <duration>1:00:00</duration>
+        <room>Speakers Tent</room>
+        <slug>1938-stop-injected-javascript-with-csp-defense-in-depth-that-works</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/stop-injected-javascript-with-csp-defense-in-depth-that-works/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>false</optout>
+        </recording>
+        <title>Stop Injected JavaScript with CSP: Defense in Depth That Works</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Talk</type>
+        <language>en</language>
+        <abstract>Most teams deploy `Content-Security-Policy`, but many policies still allow `unsa</abstract>
+        <description />
+        <persons>
+          <person id="608">Rune Philosof</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+      <event id="1934" guid="17842068-0012-1846-f189-a1187d47435c">
+        <date>2026-07-16T13:00:00+00:00</date>
+        <start>13:00:00</start>
+        <duration>1:00:00</duration>
+        <room>Speakers Tent</room>
+        <slug>1934-asking-why-until-it-hurts-how-i-learned-the-hard-part-of-compliance</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/asking-why-until-it-hurts-how-i-learned-the-hard-part-of-compliance/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>false</optout>
+        </recording>
+        <title>Asking Why Until It Hurts - how I learned the hard part of compliance</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Talk</type>
+        <language>en</language>
+        <abstract>I expected the hard part of compliance was understanding the rules. I learned th</abstract>
+        <description />
+        <persons>
+          <person id="577">Gorm Reventlow</person>
+        </persons>
+        <links>
+          <link href="https://nis2-talk.blacklog.net">Slides</link>
+        </links>
+        <attachments />
+      </event>
+      <event id="2195" guid="17842248-0012-1856-d45e-cf862fbd47fa">
+        <date>2026-07-16T18:00:00+00:00</date>
+        <start>18:00:00</start>
+        <duration>2:00:00</duration>
+        <room>Speakers Tent</room>
+        <slug>2195-hacker-jeopardy-round-1</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/hacker-jeopardy-round-1/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>Hacker Jeopardy (Round #1)</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Recreational Event</type>
+        <language>en</language>
+        <abstract>Four 3 person teams compete in a game of classical jeopardy for two of the four </abstract>
+        <description />
+        <persons>
+          <person id="572">BornHack Game Team</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+      <event id="2406" guid="17842320-0012-1931-0eb2-4f740772409d">
+        <date>2026-07-16T20:00:00+00:00</date>
+        <start>20:00:00</start>
+        <duration>2:00:00</duration>
+        <room>Speakers Tent</room>
+        <slug>2406-factorio-bingo-gaming</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/factorio-bingo-gaming/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>Factorio Bingo - Gaming!</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Recreational Event</type>
+        <language>en</language>
+        <abstract>Do you also love automation or building games? I do! Did you ever play &lt;b&gt;Factor</abstract>
+        <description />
+        <persons>
+          <person id="631">Martin Gyde Poulsen aka Gyde</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+    </room>
+    <room name="Startent at Info Desk">
+      <event id="2212" guid="17841888-0012-2892-f556-00065c0341f4">
+        <date>2026-07-16T08:00:00+00:00</date>
+        <start>08:00:00</start>
+        <duration>1:00:00</duration>
+        <room>Startent at Info Desk</room>
+        <slug>2212-good-morning-full-body-workout</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/good-morning-full-body-workout/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>Good morning full body workout</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Recreational Event</type>
+        <language>en</language>
+        <abstract>Full body workout in the morning at 10:00. No equipment needed.</abstract>
+        <description />
+        <persons>
+          <person id="609">Pizzaiolo</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+      <event id="2188" guid="17842032-0012-2880-29b0-084d339246f5">
+        <date>2026-07-16T12:00:00+00:00</date>
+        <start>12:00:00</start>
+        <duration>1:00:00</duration>
+        <room>Startent at Info Desk</room>
+        <slug>2188-daily-volunteer-meeting</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/daily-volunteer-meeting/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>Daily Volunteer Meeting</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Meetup</type>
+        <language>en</language>
+        <abstract>We want to have a short meeting each day for all available volunteers who aren't</abstract>
+        <description />
+        <persons>
+          <person id="567">BornHack</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+      <event id="2205" guid="17842068-0012-2886-bfe6-241047aa4de6">
+        <date>2026-07-16T13:00:00+00:00</date>
+        <start>13:00:00</start>
+        <duration>1:00:00</duration>
+        <room>Startent at Info Desk</room>
+        <slug>2205-soberbornhack</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/soberbornhack/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>Sober@BornHack</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Meetup</type>
+        <language>en</language>
+        <abstract>Are you staying sober? Maybe you’re struggling with sobriety? Or just sober-curi</abstract>
+        <description />
+        <persons>
+          <person id="602">Klink (Magnus Klink)</person>
+        </persons>
+        <links>
+          <link href="https://signal.group/#CjQKIJtNt2XmNkHng9CZrMyTWN5ORXeSl4hXbl4sg5Zc7j3cEhCEykdQUvo6iknEXqgNUFLv">Other</link>
+        </links>
+        <attachments />
+      </event>
+    </room>
+    <room name="Workshop Room">
+      <event id="2114" guid="17841996-0012-3853-6c9f-7e58962c43f7">
+        <date>2026-07-16T11:00:00+00:00</date>
+        <start>11:00:00</start>
+        <duration>2:00:00</duration>
+        <room>Workshop Room</room>
+        <slug>2114-from-zero-to-nis2-iso-2700x</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/from-zero-to-nis2-iso-2700x/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>From Zero to NIS2 + ISO 2700x</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Workshop</type>
+        <language>en</language>
+        <abstract>The first approximately 30 mins will be a whiteboard walk-through of NIS2 and IS</abstract>
+        <description />
+        <persons>
+          <person id="570">Alex Holst</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+      <event id="2116" guid="17842140-0012-3879-40c9-19bdf1434a6a">
+        <date>2026-07-16T15:00:00+00:00</date>
+        <start>15:00:00</start>
+        <duration>2:00:00</duration>
+        <room>Workshop Room</room>
+        <slug>2116-network-packet-construction-workshop</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/network-packet-construction-workshop/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>Network Packet Construction workshop</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Workshop</type>
+        <language>en</language>
+        <abstract>Workshop: Getting Started with Network Packets – from ping to 100G
+
+Do you wan</abstract>
+        <description />
+        <persons>
+          <person id="598">Kramse</person>
+        </persons>
+        <links>
+          <link href="https://codeberg.org/kramse/security-courses/courses/networking/packet-construction-workshop">Other</link>
+        </links>
+        <attachments />
+      </event>
+    </room>
+    <room name="NWWC Village in Party Area" />
+    <room name="BornHack Radio 102.8 FM">
+      <event id="2381" guid="17842140-0012-6921-7f3a-13b60b8f4b12">
+        <date>2026-07-16T15:00:00+00:00</date>
+        <start>15:00:00</start>
+        <duration>1:00:00</duration>
+        <room>BornHack Radio 102.8 FM</room>
+        <slug>2381-bornhack-radio-aflyttet-analog-med-kjaerulv</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/bornhack-radio-aflyttet-analog-med-kjaerulv/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>BornHack Radio: Aflyttet Analog med Kjaerulv</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Recreational Event</type>
+        <language>en</language>
+        <abstract>DA: Nyt fra BornHack + dagens analogisering - en deltager forklarer noget digita</abstract>
+        <description />
+        <persons>
+          <person id="590">BornHack Radio</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+      <event id="2312" guid="17842212-0012-6922-b543-bfab6df44e19">
+        <date>2026-07-16T17:00:00+00:00</date>
+        <start>17:00:00</start>
+        <duration>1:00:00</duration>
+        <room>BornHack Radio 102.8 FM</room>
+        <slug>2312-bornhack-radio-chads-electronics-corner</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/bornhack-radio-chads-electronics-corner/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>BornHack Radio: Chad's electronics corner</title>
+        <subtitle />
+        <track>BornHack 2026 Radio (BornHack 2026)</track>
+        <type>Recreational Event</type>
+        <language>en</language>
+        <abstract>Ever had questions about electronics? This is the secret semester curriculum for</abstract>
+        <description />
+        <persons>
+          <person id="590">BornHack Radio</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+    </room>
+    <room name="BornHack Radio Studio near Info Desk">
+      <event id="2396" guid="17842068-0012-7870-0cfe-7abc25cc49b3">
+        <date>2026-07-16T13:00:00+00:00</date>
+        <start>13:00:00</start>
+        <duration>2:00:00</duration>
+        <room>BornHack Radio Studio near Info Desk</room>
+        <slug>2396-bornhack-radio-introduction-workshop</slug>
+        <url>https://bornhack.dk/bornhack-2026/program/bornhack-radio-introduction-workshop/</url>
+        <recording>
+          <license>CC BY-SA 4.0</license>
+          <optout>true</optout>
+        </recording>
+        <title>BornHack radio introduction workshop</title>
+        <subtitle />
+        <track>BornHack 2026 (BornHack 2026)</track>
+        <type>Workshop</type>
+        <language>en</language>
+        <abstract>Learn how to broadcast at the BornHack Radio studio. We will show you how to ope</abstract>
+        <description />
+        <persons>
+          <person id="590">BornHack Radio</person>
+        </persons>
+        <links />
+        <attachments />
+      </event>
+    </room>
+    <room name="HSNL Village on Main Camping" />
+  </day>
+  </schedule>
