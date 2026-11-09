@@ -62,6 +62,8 @@ class Settings:
     presets: list[dict] = field(default_factory=list)
     #: Saved rotations, see :mod:`pypixelgui.rotation`.
     rotations: list[dict] = field(default_factory=list)
+    #: Display groups (several panels as one), see :mod:`pypixelgui.groups`.
+    groups: list[dict] = field(default_factory=list)
     #: Settings owned by add-ons (e.g. ``"mqtt"`` for pypixelgui-mqtt). Kept as
     #: plain dicts so the core app round-trips them without knowing their shape.
     plugins: dict[str, dict] = field(default_factory=dict)
@@ -73,6 +75,12 @@ class Settings:
 
     def by_alias(self, alias: str) -> DeviceEntry | None:
         return next((d for d in self.devices if d.alias == alias), None)
+
+    def group_by_alias(self, alias: str) -> dict | None:
+        return next((g for g in self.groups if g.get("alias") == alias), None)
+
+    def taken_aliases(self) -> set[str]:
+        return {d.alias for d in self.devices} | {g.get("alias") for g in self.groups}
 
     def upsert(self, entry: DeviceEntry) -> DeviceEntry:
         existing = self.find(entry.address)
@@ -100,6 +108,7 @@ class Settings:
                      for d in raw.get("devices", [])],
             presets=list(raw.get("presets", [])),
             rotations=list(raw.get("rotations", [])),
+            groups=list(raw.get("groups", [])),
             plugins=dict(raw.get("plugins", {})),
             known_devices_only=bool(raw.get("known_devices_only", False)),
         )

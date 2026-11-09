@@ -98,14 +98,26 @@ def prepare(source: str | Path | bytes, width: int, height: int, method: str = "
     for f in ImageSequence.Iterator(img):
         frames.append(_fit(_flatten(f), width, height, method))
         durations.append(int(f.info.get("duration", img.info.get("duration", 100)) or 100))
+    return prepare_frames(frames, durations, budget_kb, loop=loop, source_frames=n_frames, source_bytes=len(raw))
+
+
+def prepare_frames(frames: list[Image.Image], durations: list[int], budget_kb: float = DEFAULT_BUDGET_KB,
+                   *, loop: int = 0, source_frames: int | None = None, source_bytes: int = 0) -> PreparedImage:
+    """Encode display-sized RGB frames compactly (see module docstring)."""
+    width, height = frames[0].size
+    n_frames = source_frames or len(frames)
+    if len(frames) == 1:
+        buf = io.BytesIO()
+        frames[0].convert("RGB").save(buf, format="PNG", optimize=True)
+        return PreparedImage(buf.getvalue(), ".png", width, height, n_frames, 1, source_bytes)
 
     # One palette for every frame, built from a sample of frames.
     sample = frames[:: max(1, len(frames) // 32)][:32]
     strip = Image.new("RGB", (width, height * len(sample)))
     for i, f in enumerate(sample):
-        strip.paste(f, (0, i * height))
+        strip.paste(f.convert("RGB"), (0, i * height))
     palette = strip.quantize(colors=MAX_COLOURS, method=Image.Quantize.MEDIANCUT)
-    pframes = [f.quantize(palette=palette, dither=Image.Dither.NONE) for f in frames]
+    pframes = [f.convert("RGB").quantize(palette=palette, dither=Image.Dither.NONE) for f in frames]
 
     # Merge runs of identical frames.
     merged_f, merged_d = [pframes[0]], [durations[0]]
@@ -129,4 +141,52 @@ def prepare(source: str | Path | bytes, width: int, height: int, method: str = "
         out_f, out_d = _thin(merged_f, merged_d, keep)
         data = _encode_gif(out_f, out_d, loop)
 
-    return PreparedImage(data, ".gif", width, height, n_frames, len(out_f), len(raw))
+    if len(out_f) == 1:  # everything merged into one still frame
+        return prepare_frames([out_f[0].convert("RGB")], out_d[:1], budget_kb, source_frames=n_frames,
+                              source_bytes=source_bytes)
+    return PreparedImage(data, ".gif", width, height, n_frames, len(out_f), source_bytes)
+
+
+def decode(prepared: PreparedImage) -> tuple[list[Image.Image], list[int]]:
+    """RGB frames and durations of a prepared image."""
+    im = Image.open(io.BytesIO(prepared.data))
+    frames, durations = [], []
+    for f in ImageSequence.Iterator(im):
+        frames.append(f.convert("RGB"))
+        durations.append(int(f.info.get("duration", 100) or 100))
+    return frames, durations
+
+
+def split(prepared: PreparedImage, cols: int, rows: int,
+          budget_kb: float = DEFAULT_BUDGET_KB) -> list[PreparedImage]:
+    """Cut an image for a ``cols``×``rows`` wall of identical panels into tiles (row-major).
+
+    Every tile keeps the same frame timing, so panels that start together stay together.
+    """
+    frames, durations = decode(prepared)
+    tw, th = prepared.width // cols, prepared.height // rows
+    tiles = []
+    for r in range(rows):
+        for c in range(cols):
+            box = (c * tw, r * th, (c + 1) * tw, (r + 1) * th)
+            crops = [f.crop(box) for f in frames]
+            if len(crops) == 1:
+                tiles.append(prepare_frames(crops, durations[:1], budget_kb))
+            else:
+                # Keep every frame (even blank/duplicate ones) so tiles stay in step.
+                tiles.append(_encode_aligned(crops, durations))
+    return tiles
+
+
+def _encode_aligned(frames: list[Image.Image], durations: list[int]) -> PreparedImage:
+    width, height = frames[0].size
+    sample = frames[:: max(1, len(frames) // 32)][:32]
+    strip = Image.new("RGB", (width, height * len(sample)))
+    for i, f in enumerate(sample):
+        strip.paste(f, (0, i * height))
+    palette = strip.quantize(colors=MAX_COLOURS, method=Image.Quantize.MEDIANCUT)
+    pframes = [f.quantize(palette=palette, dither=Image.Dither.NONE) for f in frames]
+    # Pillow merges identical consecutive frames; a 1-pixel marker difference
+    # would show, so instead keep their combined duration – timing is preserved.
+    data = _encode_gif(pframes, durations, 0)
+    return PreparedImage(data, ".gif", width, height, len(frames), len(frames), len(data))

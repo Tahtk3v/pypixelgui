@@ -181,6 +181,11 @@ def user_preset(entry: dict) -> Preset:
     image = None
     if steps and steps[0][0] == "image_file":
         image = _file_thumbnail(steps[0][1].get("file", ""))
+    if steps and steps[0][0] in LIVE_KINDS:
+        kind, params = steps[0]
+        return Preset(entry["name"], "My presets", entry.get("description", "Live"),
+                      lambda w, h: [live_step(kind, params, w, h)], tuple(entry.get("swatch", ())),
+                      image=LIVE_KINDS[kind])
     return Preset(entry["name"], "My presets", entry.get("description", "Saved preset"),
                   lambda _w, _h: [(c, dict(p)) for c, p in steps], tuple(entry.get("swatch", ())),
                   image=image)
@@ -205,3 +210,44 @@ def all_presets(saved: list[dict] | None = None) -> list[Preset]:
 def find(name: str, saved: list[dict] | None = None) -> Preset | None:
     key = name.strip().lower()
     return next((p for p in all_presets(saved) if p.name.lower() == key), None)
+
+
+# --- live presets (fetch fresh data every time they are shown) -------------------------
+
+def _weather_thumb(w: int, h: int) -> Image.Image:
+    from .live.weather import icon
+    im = Image.new("RGB", (w, h))
+    ic = icon(2, h)
+    im.paste(ic, ((w - ic.width) // 2, 0))
+    return im
+
+
+def _transit_thumb(w: int, h: int) -> Image.Image:
+    im = Image.new("RGB", (w, h))
+    d = ImageDraw.Draw(im)
+    d.rectangle([w * 0.2, h * 0.1, w * 0.8, h * 0.75], fill=(255, 200, 0))
+    d.rectangle([w * 0.27, h * 0.2, w * 0.73, h * 0.45], fill=(30, 30, 30))
+    d.ellipse([w * 0.27, h * 0.75, w * 0.37, h * 0.95], fill=(200, 200, 200))
+    d.ellipse([w * 0.63, h * 0.75, w * 0.73, h * 0.95], fill=(200, 200, 200))
+    return im
+
+
+LIVE_KINDS = {"weather": _weather_thumb, "transit": _transit_thumb}
+
+
+def live_step(kind: str, params: dict, width: int, height: int) -> Step:
+    """Fetch and draw live data (runs in a worker thread; does network I/O)."""
+    if kind == "weather":
+        from .live import weather
+        data = weather.fetch(float(params["latitude"]), float(params["longitude"]),
+                             int(params.get("forecast_days", 2)))
+        frames = weather.frames(data, width, height, params.get("label", ""),
+                                int(params.get("forecast_days", 2)), params.get("lang", "nl"))
+    elif kind == "transit":
+        from .live import transit
+        deps = transit.fetch_departures(params["stop"], lines=params.get("lines") or None)
+        frames = transit.frames(deps, width, height, params.get("label", ""),
+                                int(params.get("count", 3)))
+    else:
+        raise ValueError(f"unknown live preset {kind!r}")
+    return _gif_step(frames) if len(frames) > 1 else _png_step(frames[0][0])

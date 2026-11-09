@@ -27,7 +27,9 @@ class MqttTab(QWidget):
         m = MqttSettings.from_settings(window.settings)
         lay = QVBoxLayout(self)
         intro = QLabel(
-            "Control saved displays from Home Assistant, Node-RED, etc. Topics: "
+            "Control saved displays and groups from Home Assistant (they appear automatically with "
+            "discovery on), zigbee2mqtt-style JSON on <code>&lt;base&gt;/&lt;alias&gt;/set</code>, or "
+            "Node-RED. Single commands: "
             "<code>&lt;base&gt;/&lt;alias&gt;/set/&lt;command&gt;</code>, e.g. "
             "<code>pypixel/desk/set/send_text</code> or <code>pypixel/desk/set/preset</code> "
             "with payload <code>CYBER</code>. Only displays saved under <i>Security</i> are reachable.")
@@ -43,11 +45,15 @@ class MqttTab(QWidget):
         self.base = QLineEdit(m.base_topic)
         self.client_id = QLineEdit(m.client_id)
         self.destructive = QCheckBox("Allow clear/delete over MQTT", checked=m.allow_destructive)
+        self.ha = QCheckBox("Home Assistant discovery (displays appear in HA automatically)",
+                            checked=m.ha_discovery)
+        self.ha_prefix = QLineEdit(m.ha_prefix)
         self.autostart = QCheckBox("Start with the app", checked=m.enabled)
         for label, widget in (("Broker host", self.host), ("Port", self.port), ("Username", self.user),
                               ("Password", self.password), ("", self.tls), ("CA file", self.ca),
                               ("Base topic", self.base), ("Client ID", self.client_id),
-                              ("", self.destructive), ("", self.autostart)):
+                              ("", self.destructive), ("", self.ha), ("Discovery prefix", self.ha_prefix),
+                              ("", self.autostart)):
             form.addRow(label, widget)
         row = QHBoxLayout()
         start = QPushButton("Save && start")
@@ -72,7 +78,8 @@ class MqttTab(QWidget):
             tls=self.tls.isChecked(), ca_certs=self.ca.text().strip(),
             client_id=self.client_id.text().strip() or "pypixelgui",
             base_topic=self.base.text().strip().strip("/") or "pypixel",
-            allow_destructive=self.destructive.isChecked())
+            allow_destructive=self.destructive.isChecked(), ha_discovery=self.ha.isChecked(),
+            ha_prefix=self.ha_prefix.text().strip().strip("/") or "homeassistant")
 
     def start(self) -> None:
         self._collect().store(self.window.settings)
@@ -91,6 +98,11 @@ class MqttTab(QWidget):
             self.bridge = None
 
     shutdown = stop
+
+    def settings_changed(self) -> None:
+        """Presets, rotations, displays or groups changed: refresh HA entities and state."""
+        if self.bridge is not None:
+            self.bridge.publish_all()
 
     def _show_status(self, text: str) -> None:
         self.status.setText(text)

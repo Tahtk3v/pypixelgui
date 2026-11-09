@@ -11,7 +11,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
-    QAbstractItemView, QGridLayout, QInputDialog, QScrollArea, QCheckBox, QColorDialog, QComboBox, QFileDialog, QFormLayout, QGroupBox,
+    QAbstractItemView, QDialog, QGridLayout, QInputDialog, QScrollArea, QCheckBox, QColorDialog, QComboBox, QFileDialog, QFormLayout, QGroupBox,
     QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
     QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSlider, QSpinBox, QSplitter, QTableWidget,
     QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
@@ -22,6 +22,8 @@ from .. import presets as presets_mod
 from ..commands import ANIMATIONS
 from ..config import DeviceEntry, Settings, slugify
 from ..device_manager import DeviceManager, FoundDevice
+from .. import groups as groups_mod
+from .group_dialog import GroupDialog
 from .rotation_tab import RotationTab
 
 log = logging.getLogger(__name__)
@@ -90,6 +92,9 @@ class MainWindow(QMainWindow):
         self.rotation_tab = RotationTab(self, _preset_icon)
         self.tabs.addTab(self.rotation_tab, "Rotation")
         self.tabs.addTab(self._build_text_tab(), "Text")
+        from .live_tab import LiveTab
+        self.live_tab = LiveTab(self)
+        self.tabs.addTab(self.live_tab, "Live")
         self.tabs.addTab(self._build_image_tab(), "Image")
         self.tabs.addTab(self._build_clock_tab(), "Clock")
         self.tabs.addTab(self._build_display_tab(), "Display")
@@ -111,6 +116,16 @@ class MainWindow(QMainWindow):
             self._upsert_item(dev.address, dev.name)
             if dev.hold:
                 manager.set_hold(dev.address, True)
+        for g in settings.groups:
+            try:
+                spec = groups_mod.GroupSpec.from_dict(g)
+                manager.set_group(spec)
+            except (KeyError, ValueError) as e:
+                log.warning("skipping invalid group %s: %s", g.get("name"), e)
+                continue
+            self._upsert_item(spec.address, spec.name)
+            if spec.hold:
+                manager.set_hold(spec.address, True)
         self._refresh_known_table()
         self._ui_ready = True
         self._update_controls()
@@ -486,6 +501,16 @@ class MainWindow(QMainWindow):
         krow.addWidget(save_dev)
         krow.addWidget(forget)
         krow.addStretch()
+        combine = QPushButton("Combine displays…")
+        combine.setToolTip("Use several identical displays as one bigger display")
+        combine.clicked.connect(lambda: self._edit_group(None))
+        edit_group = QPushButton("Edit group…")
+        edit_group.clicked.connect(lambda: self._edit_group(self.manager.group(self.current_address() or "")))
+        del_group = QPushButton("Delete group")
+        del_group.clicked.connect(self._delete_group)
+        krow.addWidget(combine)
+        krow.addWidget(edit_group)
+        krow.addWidget(del_group)
         sl.addLayout(krow)
         lay.addWidget(sec)
 
@@ -585,6 +610,9 @@ class MainWindow(QMainWindow):
         return item.data(ADDR_ROLE) if item else None
 
     def _label_for(self, address: str) -> str:
+        spec = self.manager.group(address)
+        if spec is not None:
+            return spec.name
         dev = self.settings.find(address)
         return (dev.name if dev and dev.name else None) or address
 
@@ -616,7 +644,14 @@ class MainWindow(QMainWindow):
             tags.append("⟳ rotating")
         if self.settings.find(addr):
             tags.append("saved")
-        if self.manager.kind(addr) == "iledcolor":
+        spec = self.manager.group(addr)
+        if spec is not None:
+            info = self.manager.device_info(addr) if self.manager.is_connected(addr) else None
+            size = f" · {info.width}×{info.height}" if info else ""
+            tags.insert(0, f"Group of {len(spec.members)} ({spec.cols}×{spec.rows}){size}")
+            if "saved" in tags:
+                tags.remove("saved")
+        elif self.manager.kind(addr) == "iledcolor":
             panel = self.manager._hints.get(addr, {}).get("panel") or {}
             size = f" {panel['width']}×{panel['height']}" if panel.get("width") else ""
             tags.insert(0, f"iLEDColor{size}")
@@ -654,7 +689,10 @@ class MainWindow(QMainWindow):
             if info is None:
                 self.info_label.setText("<b>Connected</b>")
             else:
-                family = "iLEDColor" if getattr(info, "kind", "") == "iledcolor" else f"iPixel type {info.led_type}"
+                kind = getattr(info, "kind", "")
+                family = {"iledcolor": "iLEDColor",
+                          "group": f"group of {getattr(info, 'panels', '?')} displays"}.get(
+                              kind, f"iPixel type {info.led_type}")
                 pw = "none" if info.password_flag == 255 else "set"
                 self.info_label.setText(f"<b>Connected</b><br>{info.width}×{info.height} · {family}<br>"
                                         f"Device password: {pw}")
@@ -672,7 +710,7 @@ class MainWindow(QMainWindow):
         addr = self.current_address()
         if not addr:
             return
-        if self.settings.known_devices_only and not self.settings.find(addr):
+        if self.settings.known_devices_only and not self.settings.find(addr) and not groups_mod.is_group(addr):
             QMessageBox.warning(self, "Not allowed",
                                 "Only saved displays may be connected. Save it under Security, "
                                 "or turn off “Only allow connecting to saved displays”.")
@@ -692,6 +730,10 @@ class MainWindow(QMainWindow):
             self.hold_check.setChecked(False)
             return
         self.manager.set_hold(addr, on)
+        g = self.settings.group_by_alias(addr[len(groups_mod.PREFIX):]) if groups_mod.is_group(addr) else None
+        if g is not None:
+            g["hold"] = on
+            self.save_settings()
         dev = self.settings.find(addr)
         if dev:
             dev.hold = on
@@ -793,6 +835,12 @@ class MainWindow(QMainWindow):
             self.settings.save()
         except OSError as e:
             self.log(f"Could not save settings: {e}")
+        for tab in getattr(self, "_plugin_tabs", []):
+            if hasattr(tab, "settings_changed"):
+                try:
+                    tab.settings_changed()
+                except Exception:
+                    log.exception("add-on failed to handle a settings change")
 
     def _set_known_only(self, on: bool) -> None:
         self.settings.known_devices_only = on
@@ -812,6 +860,44 @@ class MainWindow(QMainWindow):
         self._refresh_known_table()
         self.refresh_device_list()
         self.log(f"Saved {name or addr} (remote alias “{dev.alias}”)")
+
+    def _edit_group(self, existing) -> None:
+        if existing is None and self.sender() and self.sender().text().startswith("Edit"):
+            self.log("Select a group in the display list first.")
+            return
+        if len(self.settings.devices) < 2:
+            QMessageBox.information(self, "Combine displays",
+                                    "Save at least two displays first (connect each, then “Save selected display”).")
+            return
+        dlg = GroupDialog(self, self.settings, existing)
+        if dlg.exec() != QDialog.Accepted or dlg.result_spec is None:
+            return
+        spec = dlg.result_spec
+        if existing is not None:
+            self.manager.remove_group(existing.alias).result(10)
+        self.manager.set_group(spec)
+        self.settings.groups = [g for g in self.settings.groups if g.get("alias") != spec.alias] + [spec.to_dict()]
+        self.save_settings()
+        it = self._upsert_item(spec.address, spec.name)
+        self.device_list.setCurrentItem(it)
+        self.log(f"Group “{spec.name}” ready ({spec.cols}×{spec.rows}). Connect it like any display.")
+
+    def _delete_group(self) -> None:
+        spec = self.manager.group(self.current_address() or "")
+        if spec is None:
+            self.log("Select a group in the display list first.")
+            return
+        if QMessageBox.question(self, "Delete group", f"Delete the group “{spec.name}”? "
+                                "The displays themselves are kept.") != QMessageBox.Yes:
+            return
+        self.manager.remove_group(spec.alias).result(10)
+        self.settings.groups = [g for g in self.settings.groups if g.get("alias") != spec.alias]
+        self.save_settings()
+        for i in range(self.device_list.count()):
+            if self.device_list.item(i).data(ADDR_ROLE) == spec.address:
+                self.device_list.takeItem(i)
+                break
+        self._update_controls()
 
     def _forget_device(self) -> None:
         row = self.known_table.currentRow()

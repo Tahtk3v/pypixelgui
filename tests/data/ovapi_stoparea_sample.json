@@ -1,0 +1,22 @@
+{
+  "utcsbu": {
+    "50000020": {
+      "Stop": {"TimingPointCode": "50000020", "TimingPointName": "Utrecht, Centraal Station", "TimingPointTown": "Utrecht", "StopAreaCode": "utcsbu"},
+      "Passes": {
+        "QBUZZ_u012_1001_1": {"DataOwnerCode": "QBUZZ", "LinePublicNumber": "12", "DestinationName50": "Uithof via Galgenwaard", "TransportType": "BUS", "TripStopStatus": "DRIVING", "TargetDepartureTime": "2026-11-09T13:40:00", "ExpectedDepartureTime": "2026-11-09T13:43:00"},
+        "QBUZZ_u028_2001_1": {"DataOwnerCode": "QBUZZ", "LinePublicNumber": "28", "DestinationName50": "Station Maarssen", "TransportType": "BUS", "TripStopStatus": "PLANNED", "TargetDepartureTime": "2026-11-09T13:36:00", "ExpectedDepartureTime": "2026-11-09T13:36:00"},
+        "QBUZZ_u012_0999_1": {"DataOwnerCode": "QBUZZ", "LinePublicNumber": "12", "DestinationName50": "Uithof via Galgenwaard", "TransportType": "BUS", "TripStopStatus": "PASSED", "TargetDepartureTime": "2026-11-09T13:30:00", "ExpectedDepartureTime": "2026-11-09T13:31:00"},
+        "QBUZZ_u008_3001_1": {"DataOwnerCode": "QBUZZ", "LinePublicNumber": "8", "DestinationName50": "Lunetten", "TransportType": "BUS", "TripStopStatus": "CANCEL", "TargetDepartureTime": "2026-11-09T13:50:00", "ExpectedDepartureTime": "2026-11-09T13:50:00"}
+      },
+      "GeneralMessages": {}
+    },
+    "50000021": {
+      "Stop": {"TimingPointCode": "50000021", "TimingPointName": "Utrecht, Centraal Station", "TimingPointTown": "Utrecht", "StopAreaCode": "utcsbu"},
+      "Passes": {
+        "QBUZZ_u012_1001_1": {"DataOwnerCode": "QBUZZ", "LinePublicNumber": "12", "DestinationName50": "Uithof via Galgenwaard", "TransportType": "BUS", "TripStopStatus": "DRIVING", "TargetDepartureTime": "2026-11-09T13:40:00", "ExpectedDepartureTime": "2026-11-09T13:43:00"},
+        "QBUZZ_u022_4001_1": {"DataOwnerCode": "QBUZZ", "LinePublicNumber": "22", "DestinationName50": "Nieuwegein Zuid", "TransportType": "TRAM", "TripStopStatus": "DRIVING", "TargetDepartureTime": "2026-11-09T13:34:00", "ExpectedDepartureTime": "2026-11-09T13:34:30"}
+      },
+      "GeneralMessages": {}
+    }
+  }
+}

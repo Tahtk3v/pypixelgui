@@ -25,8 +25,19 @@ A cross-platform (Windows / macOS / Linux) desktop app for Bluetooth LED display
   file is over the **Max size** (default 150 KB). Big uploads take minutes over
   Bluetooth and make displays drop the connection, so a progress bar shows how far along it is.
 - **Clock**, brightness, power, orientation, slots, scoreboard, timer.
+- **Live** – weather (current + forecast, any place) and real-time Dutch public transport
+  departures (bus, tram, metro, ferry – all operators via OVapi). Show them now, keep them
+  updated every few minutes, or save them as presets: they fetch fresh data every time
+  they're shown, so they also work in rotations and from Home Assistant.
+- **Combine displays** – put identical displays side by side or stacked and use them as one
+  bigger display (Security → *Combine displays…*). Text, images, presets, live data,
+  rotations and MQTT all work on the group; brightness and power go to every panel.
+  Animations are restarted on all panels together after uploading (automatic on
+  iLEDColor; on iPixel tick *start animations together* and pick a free slot).
 - **Locking displays** – see below.
-- **MQTT** – optional add-on in [`mqtt/`](mqtt/README.md).
+- **MQTT / Home Assistant** – optional add-on in [`mqtt/`](mqtt/README.md): displays and
+  groups appear in Home Assistant automatically (light with presets as effects, message
+  box, preset/rotation selects), with zigbee2mqtt-style JSON topics for everything else.
 
 ## Install & run
 
@@ -59,6 +70,14 @@ The GUI picks up the add-on automatically and shows an **MQTT** tab.
   `CERTIFICATE_VERIFY_FAILED`).
   macOS hides real Bluetooth addresses, so devices show up as UUIDs – that's normal.
 - **Windows 10/11**: works with the built-in Bluetooth stack.
+
+## Data sources
+
+- Weather: [Open-Meteo](https://open-meteo.com/) – free, no key, data licensed CC BY 4.0.
+- Departures: [OVapi](https://ovapi.nl/) – free, no key; covers buses, trams, metro and
+  ferries of all Dutch operators. NS trains aren't in OVapi (the NS API needs a personal
+  key – could be added later). The list of stops (~a few MB) is downloaded once and
+  cached in the settings folder.
 
 ## Locking displays
 
@@ -99,6 +118,8 @@ src/pypixelgui/
   media.py           shrinks images/GIFs for a display before upload
   drivers/           iLEDColor protocol (pure, tested against published vectors) + BLE client
   rotation.py        saved rotations
+  groups.py          several displays as one (virtual device "group:<alias>")
+  live/              weather (Open-Meteo) and NL departures (OVapi)
   config.py          JSON settings in the per-user config dir
   gui/               PySide6 window
 mqtt/                pypixelgui-mqtt add-on (separate package – can move to its own repo)
