@@ -14,10 +14,12 @@ def main(argv: list[str] | None = None) -> int:
         print("The GUI needs PySide6: pip install pypixelgui", file=sys.stderr)
         return 1
 
+    from ..compat import ensure_ca_certificates
     from ..config import Settings
     from ..device_manager import DeviceManager
     from .main_window import MainWindow
 
+    ensure_ca_certificates()
     app = QApplication(sys.argv if argv is None else argv)
     app.setApplicationName("PyPixel GUI")
     window = MainWindow(DeviceManager(), Settings.load())

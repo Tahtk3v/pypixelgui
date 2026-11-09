@@ -12,6 +12,7 @@ import signal
 import threading
 from pathlib import Path
 
+from pypixelgui.compat import ensure_ca_certificates
 from pypixelgui.config import Settings, default_path
 from pypixelgui.device_manager import DeviceManager
 
@@ -26,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
+    ensure_ca_certificates()
     settings = Settings.load(args.config)
     if not settings.devices:
         ap.error(f"no devices in {args.config}; add one with the GUI first")
