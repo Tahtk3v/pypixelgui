@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pypixelgui-mqtt"
+version = "0.1.0"
+description = "MQTT bridge for pypixelgui: drive iPixel Color LED displays from Home Assistant, Node-RED, etc."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+  "pypixelgui>=0.1.0",
+  "paho-mqtt>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+pypixelgui-bridge = "pypixelgui_mqtt.headless:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pypixelgui_mqtt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[project.entry-points."pypixelgui.tabs"]
+mqtt = "pypixelgui_mqtt.gui_tab:create_tab"
