@@ -25,10 +25,16 @@ A cross-platform (Windows / macOS / Linux) desktop app for Bluetooth LED display
   file is over the **Max size** (default 150 KB). Big uploads take minutes over
   Bluetooth and make displays drop the connection, so a progress bar shows how far along it is.
 - **Clock**, brightness, power, orientation, slots, scoreboard, timer.
-- **Live** – weather (current + forecast, any place) and real-time Dutch public transport
-  departures (bus, tram, metro, ferry – all operators via OVapi). Show them now, keep them
-  updated every few minutes, or save them as presets: they fetch fresh data every time
-  they're shown, so they also work in rotations and from Home Assistant.
+- **Live** – show now, keep updated, or save as presets that fetch fresh data every
+  time they're shown (so they work in rotations and from Home Assistant):
+  - **Weather** – current + forecast for any place.
+  - **Departures** – real-time Dutch buses, trams, metro and ferries (OVapi), with the
+    vehicle type and platform when known; **trains with platforms** via the NS API
+    (needs a free personal key from apiportal.ns.nl).
+  - **Event schedules** – what's on now and next at BornHack, eth0 or any event that
+    publishes a frab/pretalx `schedule.xml`, with the room and the event's own icon.
+  - Text size and scroll speed (characters per second) adapt to the panel; panels two or
+    more rows tall show rows (pages of departures/talks) instead of one scrolling line.
 - **Combine displays** – put identical displays side by side or stacked and use them as one
   bigger display (Security → *Combine displays…*). Text, images, presets, live data,
   rotations and MQTT all work on the group; brightness and power go to every panel.
@@ -75,9 +81,12 @@ The GUI picks up the add-on automatically and shows an **MQTT** tab.
 
 - Weather: [Open-Meteo](https://open-meteo.com/) – free, no key, data licensed CC BY 4.0.
 - Departures: [OVapi](https://ovapi.nl/) – free, no key; covers buses, trams, metro and
-  ferries of all Dutch operators. NS trains aren't in OVapi (the NS API needs a personal
-  key – could be added later). The list of stops (~a few MB) is downloaded once and
-  cached in the settings folder.
+  ferries of all Dutch operators. The list of stops (~a few MB) is downloaded once and
+  cached in the settings folder. Trains: [NS API](https://apiportal.ns.nl/) – free personal
+  key (product "Ns-App"); paste it on the Live tab.
+- Event schedules: frab XML exports (BornHack: `/bornhack-YYYY/program/frab.xml`,
+  eth0: `content.eth0.nl/en/<edition>/public/schedule.xml`). Icons come from the event's
+  website and are cached in the settings folder.
 
 ## Locking displays
 

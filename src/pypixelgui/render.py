@@ -9,6 +9,7 @@ from __future__ import annotations
 import colorsys
 import io
 from functools import lru_cache
+from dataclasses import dataclass, field
 from typing import Iterable
 
 from PIL import Image, ImageDraw, ImageFont
@@ -158,9 +159,9 @@ def encode_gif(frames: Iterable[Frame]) -> bytes:
 
 # --- strips of text and icons (weather, departures) ---------------------------------
 
-def segment_font_size(height: int) -> int:
-    """Largest crisp Unifont size for this height (16, 32, …)."""
-    return max(16, 16 * (height // 16))
+def segment_font_size(height: int, width: int | None = None) -> int:
+    """Crisp Unifont size (16, 32, …) for this panel; see :func:`font_for`."""
+    return font_for(width, height) if width else max(16, 16 * (height // 16))
 
 
 def text_segment(text: str, color: str, height: int, size: int | None = None) -> Image.Image:
@@ -179,37 +180,140 @@ def badge(text: str, fg: str, bg: str, height: int, size: int | None = None, pad
     return seg
 
 
-#: Default scroll speed for live data, in pixels per second (readable on 16-pixel panels).
-SCROLL_SPEEDS = {"slow": 16, "normal": 24, "fast": 40}
+#: Scroll speeds in characters per second, so text feels equally fast on any panel size.
+SCROLL_SPEEDS = {"slow": 2.0, "normal": 3.0, "fast": 5.0}
 MAX_MARQUEE_FRAMES = 600
+ROW_HEIGHT = 16
 
 
-def marquee(segments: list[Image.Image], width: int, height: int, gap: int = 4, hold_ms: int = 4000,
-            speed: float = SCROLL_SPEEDS["normal"]) -> list[Frame]:
-    """Join segments left to right; show still if it fits, otherwise scroll it through once.
+def font_for(width: int, height: int) -> int:
+    """Font size for one line of text: as tall as the panel allows, but small
+    enough that at least ~8 characters fit across (Unifont glyphs are half as
+    wide as they are tall)."""
+    by_height = max(1, height // 16)
+    by_width = max(1, width // 64)
+    return 16 * min(by_height, by_width)
 
-    ``speed`` is in pixels per second. The step per frame grows only when the
-    text is so long that it would need more than MAX_MARQUEE_FRAMES frames; the
-    frame time grows with it, so the speed stays the same.
-    """
+
+def pixels_per_second(speed, size: int) -> float:
+    """``speed`` is a name from SCROLL_SPEEDS or characters per second."""
+    cps = SCROLL_SPEEDS.get(speed, speed) if isinstance(speed, str) else speed
+    try:
+        cps = float(cps)
+    except (TypeError, ValueError):
+        cps = SCROLL_SPEEDS["normal"]
+    return max(1.0, cps * size / 2)
+
+
+def _strip(segments: list[Image.Image], height: int, gap: int) -> Image.Image:
     total = sum(s.width for s in segments) + gap * max(0, len(segments) - 1)
     strip = Image.new("RGB", (max(1, total), height))
     x = 0
     for s in segments:
         strip.paste(s, (x, (height - s.height) // 2))
         x += s.width + gap
+    return strip
+
+
+def _step_and_ms(distance: int, pps: float) -> tuple[int, int]:
+    step = max(1, -(-distance // MAX_MARQUEE_FRAMES))
+    if step == 1 and pps > 30:
+        step = 2  # fewer frames for the same speed
+    return step, max(20, round(step * 1000 / pps))
+
+
+def marquee(segments: list[Image.Image], width: int, height: int, gap: int = 4, hold_ms: int = 4000,
+            speed="normal", size: int = 16) -> list[Frame]:
+    """Join segments left to right; show still if it fits, otherwise scroll it through once."""
+    strip = _strip(segments, height, gap)
+    total = strip.width
     if total <= width:
         frame = Image.new("RGB", (width, height))
         frame.paste(strip, ((width - total) // 2, 0))
         return [(frame, hold_ms)]
     distance = width + total
-    step = max(1, -(-distance // MAX_MARQUEE_FRAMES))
-    if step == 1 and speed > 25:
-        step = 2  # fewer frames for the same speed
-    frame_ms = max(20, round(step * 1000 / max(1.0, float(speed))))
+    step, frame_ms = _step_and_ms(distance, pixels_per_second(speed, size))
     out = []
     for x in range(width, -total - 1, -step):
         frame = Image.new("RGB", (width, height))
         frame.paste(strip, (x, 0))
         out.append((frame, frame_ms))
     return out
+
+
+@dataclass
+class Row:
+    """One line of a multi-line layout: ``left`` and ``right`` stay put, ``body``
+    sits between them and scrolls if it doesn't fit."""
+    left: list = field(default_factory=list)
+    body: list = field(default_factory=list)
+    right: list = field(default_factory=list)
+
+
+def rows_frames(rows: list[Row], width: int, height: int, speed="normal", gap: int = 3,
+                hold_ms: int = 4000, pause_ms: int = 1200) -> list[Frame]:
+    """Several 16-pixel rows stacked; rows whose middle part is too long scroll
+    it (left to right edge), all at the same speed. Rows that fit stay still."""
+    rows = rows[: max(1, height // ROW_HEIGHT)]
+    y0 = (height - len(rows) * ROW_HEIGHT) // 2
+    pps = pixels_per_second(speed, ROW_HEIGHT)
+    prepared = []
+    longest = 0
+    for r in rows:
+        left = _strip(r.left, ROW_HEIGHT, gap) if r.left else None
+        right = _strip(r.right, ROW_HEIGHT, gap) if r.right else None
+        x0 = left.width + gap if left else 0
+        x1 = width - (right.width + gap if right else 0)
+        body = _strip(r.body, ROW_HEIGHT, gap) if r.body else None
+        room = max(0, x1 - x0)
+        travel = max(0, body.width - room) if body else 0
+        longest = max(longest, travel)
+        prepared.append((left, body, right, x0, x1, room, travel))
+
+    def draw(offset: int) -> Image.Image:
+        frame = Image.new("RGB", (width, height))
+        for i, (left, body, right, x0, x1, room, travel) in enumerate(prepared):
+            y = y0 + i * ROW_HEIGHT
+            if body is not None and room > 0:
+                o = min(offset, travel)
+                frame.paste(body.crop((o, 0, o + room, ROW_HEIGHT)), (x0, y))
+            if left is not None:
+                frame.paste(left, (0, y))
+            if right is not None:
+                frame.paste(right, (width - right.width, y))
+        return frame
+
+    if longest == 0:
+        return [(draw(0), hold_ms)]
+    step, frame_ms = _step_and_ms(longest, pps)
+    offsets = list(range(0, longest + 1, step))
+    if offsets[-1] != longest:
+        offsets.append(longest)
+    frames = [(draw(o), frame_ms) for o in offsets]
+    first, last = frames[0][0], frames[-1][0]
+    return [(first, pause_ms)] + frames[1:-1] + [(last, pause_ms)]
+
+
+def pages_frames(pages: list[list[Row]], width: int, height: int, speed="normal",
+                 hold_ms: int = 3500) -> list[Frame]:
+    """Show pages of rows one after another (like a station board paging)."""
+    out: list[Frame] = []
+    for page in pages:
+        frames = rows_frames(page, width, height, speed, hold_ms=hold_ms)
+        out.extend(frames)
+    return out
+
+
+def layout(one_line: list[Image.Image], items: list[list[Row]], width: int, height: int,
+           mode: str = "auto", speed="normal", size: int = 16) -> list[Frame]:
+    """One scrolling line, or rows: each item is one or more rows; items are
+    grouped into pages that fit the panel's height. ``auto`` uses rows when the
+    panel is at least two rows tall."""
+    rows_fit = height // ROW_HEIGHT
+    use_rows = mode == "rows" or (mode == "auto" and rows_fit >= 2)
+    if use_rows and items and rows_fit >= 1:
+        per_item = max(len(i) for i in items)
+        per_page = max(1, rows_fit // per_item)
+        pages = [[r for item in items[i:i + per_page] for r in item] for i in range(0, len(items), per_page)]
+        return pages_frames(pages, width, height, speed)
+    return marquee(one_line, width, height, speed=speed, size=size)
