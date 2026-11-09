@@ -100,3 +100,62 @@ def test_spec_validation():
         groups.GroupSpec("x", "x", 2, 1, ["A"]).validate()
     with pytest.raises(ValueError):
         groups.GroupSpec("x", "x", 2, 1, ["A", "A"]).validate()
+
+
+def test_animations_are_resynced_every_loop(wall):
+    m, spec = wall
+    m.connect(spec.address).result(5)
+    frames = [Image.new("RGB", (64, 16), c) for c in ("red", "blue")]
+    prepared = media.prepare_frames(frames, [100, 100])  # 0.2 s loop
+    group = m._clients[spec.address]
+    m.submit(group.send_prepared(prepared)).result(5)
+    time.sleep(0.75)
+    replays = [e for e in Panel.log if e[0] == "replay"]
+    assert len(replays) >= 2 * 3  # initial restart + at least two loops, on both panels
+    m.submit(group.disconnect()).result(5)
+    n = len([e for e in Panel.log if e[0] == "replay"])
+    time.sleep(0.35)
+    assert len([e for e in Panel.log if e[0] == "replay"]) == n  # stops with the content
+
+
+class _IPixel:
+    """Client without replay_last – like pypixelcolor's."""
+
+    def __init__(self, address):
+        self.address = address
+        self.is_connected = True
+        self.shown = []
+
+    async def connect(self):
+        pass
+
+    def get_device_info(self):
+        return type("I", (), {"width": 32, "height": 16})()
+
+    async def show_slot(self, number):
+        self.shown.append(number)
+
+    async def send_image_hex(self, **kw):
+        pass
+
+
+@pytest.mark.parametrize("slot", [None, 9])
+def test_ipixel_group_sync_via_slot(slot):
+    m = DeviceManager()
+    clients = {}
+    m._client_factory = lambda a: m._make_client(a) if groups.is_group(a) else clients.setdefault(a, _IPixel(a))
+    spec = groups.GroupSpec("W", "w", 2, 1, ["A", "B"], sync_slot=slot)
+    m.set_group(spec)
+    events = []
+    m.add_listener(lambda ev, d: events.append(ev))
+    try:
+        m.connect(spec.address).result(5)
+        frames = [Image.new("RGB", (64, 16), c) for c in ("red", "blue")]
+        m.submit(m._clients[spec.address].send_prepared(media.prepare_frames(frames, [100, 100]))).result(5)
+        time.sleep(0.3)
+        if slot:
+            assert clients["A"].shown and clients["A"].shown[0] == 9 and "group_unsynced" not in events
+        else:
+            assert not clients["A"].shown and "group_unsynced" in events
+    finally:
+        m.shutdown()

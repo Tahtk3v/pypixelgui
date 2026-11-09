@@ -235,6 +235,11 @@ def _transit_thumb(w: int, h: int) -> Image.Image:
 LIVE_KINDS = {"weather": _weather_thumb, "transit": _transit_thumb}
 
 
+def _speed(params: dict) -> float:
+    v = params.get("speed", "normal")
+    return float(render.SCROLL_SPEEDS.get(v, v)) if v else render.SCROLL_SPEEDS["normal"]
+
+
 def live_step(kind: str, params: dict, width: int, height: int) -> Step:
     """Fetch and draw live data (runs in a worker thread; does network I/O)."""
     if kind == "weather":
@@ -242,12 +247,20 @@ def live_step(kind: str, params: dict, width: int, height: int) -> Step:
         data = weather.fetch(float(params["latitude"]), float(params["longitude"]),
                              int(params.get("forecast_days", 2)))
         frames = weather.frames(data, width, height, params.get("label", ""),
-                                int(params.get("forecast_days", 2)), params.get("lang", "nl"))
+                                int(params.get("forecast_days", 2)), params.get("lang", "nl"),
+                                speed=_speed(params))
     elif kind == "transit":
         from .live import transit
         deps = transit.fetch_departures(params["stop"], lines=params.get("lines") or None)
         frames = transit.frames(deps, width, height, params.get("label", ""),
-                                int(params.get("count", 3)))
+                                int(params.get("count", 3)), speed=_speed(params))
     else:
         raise ValueError(f"unknown live preset {kind!r}")
-    return _gif_step(frames) if len(frames) > 1 else _png_step(frames[0][0])
+    if len(frames) == 1:
+        return _png_step(frames[0][0])
+    # Long scrolls make many frames: use the compact encoder (shared palette) and
+    # keep every frame so the scroll stays smooth and at the chosen speed.
+    from . import media
+    prepared = media.prepare_frames([f for f, _ in frames], [d for _, d in frames], budget_kb=10_000)
+    return ("send_image_b64", {"data": base64.b64encode(prepared.data).decode(), "ext": ".gif",
+                               "resize_method": "fit"})

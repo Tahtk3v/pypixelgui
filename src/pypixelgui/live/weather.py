@@ -186,5 +186,5 @@ def segments(w: Weather, place: str = "", forecast_days: int = 2, lang: str = "n
 
 
 def frames(w: Weather, width: int, height: int, place: str = "", forecast_days: int = 2,
-           lang: str = "nl") -> list[render.Frame]:
-    return render.marquee(segments(w, place, forecast_days, lang, height), width, height)
+           lang: str = "nl", speed: float = render.SCROLL_SPEEDS["normal"]) -> list[render.Frame]:
+    return render.marquee(segments(w, place, forecast_days, lang, height), width, height, speed=speed)

@@ -1007,6 +1007,9 @@ class MainWindow(QMainWindow):
                 self.pw_new.clear()
                 self.log(f"{label}: password {'removed' if not data['new'] else 'saved on the display'}"
                          + ("" if dev else " (save the display under Security so the app remembers it)"))
+        elif event == "group_unsynced":
+            self.log(f"{label}: the panels play this animation on their own clocks, so they won't line up. "
+                     "Security → Edit group… → tick “start animations together” to keep them in step.")
         elif event == "_upload_done":
             self._uploading.discard(addr)
         elif event == "rotation_stopped" and data.get("message"):
