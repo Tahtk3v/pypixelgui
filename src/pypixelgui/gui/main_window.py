@@ -21,6 +21,7 @@ from .. import presets as presets_mod
 from ..commands import ANIMATIONS
 from ..config import DeviceEntry, Settings, slugify
 from ..device_manager import DeviceManager, FoundDevice
+from .rotation_tab import RotationTab
 
 log = logging.getLogger(__name__)
 
@@ -84,6 +85,8 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self._build_device_panel())
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_presets_tab(), "Presets")
+        self.rotation_tab = RotationTab(self, _preset_icon)
+        self.tabs.addTab(self.rotation_tab, "Rotation")
         self.tabs.addTab(self._build_text_tab(), "Text")
         self.tabs.addTab(self._build_image_tab(), "Image")
         self.tabs.addTab(self._build_clock_tab(), "Clock")
@@ -212,15 +215,23 @@ class MainWindow(QMainWindow):
                 self._action_buttons.append(btn)
             self.presets_layout.addWidget(box)
         self.presets_layout.addStretch()
+        if hasattr(self, "rotation_tab"):
+            self.rotation_tab.refresh_presets()
         if self._ui_ready:
             self._update_controls()
 
     def _run_preset(self, preset: presets_mod.Preset) -> None:
-        addr = self._current_address()
+        addr = self.current_address()
         if not addr or not self.manager.is_connected(addr):
             self.log("Connect to a display first.")
             return
+        self._interrupt_rotation(addr)
         self.manager.run_preset(addr, preset)
+
+    def _interrupt_rotation(self, addr: str) -> None:
+        """Anything sent by hand takes over the display, so the rotation stops."""
+        if self.manager.stop_rotation(addr):
+            self.log("Rotation stopped because you sent something by hand.")
 
     def _save_text_as_preset(self) -> None:
         params = self._text_params()
@@ -443,7 +454,7 @@ class MainWindow(QMainWindow):
         ts = _dt.datetime.now().strftime("%H:%M:%S")
         self.log_view.appendPlainText(f"[{ts}] {msg}")
 
-    def _current_address(self) -> str | None:
+    def current_address(self) -> str | None:
         item = self.device_list.currentItem()
         return item.data(ADDR_ROLE) if item else None
 
@@ -475,17 +486,19 @@ class MainWindow(QMainWindow):
             tags.append("● connected")
         if self.manager.is_held(addr):
             tags.append("🔒 held")
+        if self.manager.rotation_running(addr):
+            tags.append("⟳ rotating")
         if self.settings.find(addr):
             tags.append("saved")
         name = it.data(NAME_ROLE) or "LED display"
         it.setText(f"{name}\n{addr}" + (f"\n{'  ·  '.join(tags)}" if tags else ""))
 
-    def _refresh_items(self) -> None:
+    def refresh_device_list(self) -> None:
         for i in range(self.device_list.count()):
             self._render_item(self.device_list.item(i))
 
     def _update_controls(self) -> None:
-        addr = self._current_address()
+        addr = self.current_address()
         connected = bool(addr) and self.manager.is_connected(addr)
         self.connect_btn.setEnabled(bool(addr) and not connected)
         self.disconnect_btn.setEnabled(connected)
@@ -494,6 +507,8 @@ class MainWindow(QMainWindow):
         for b in self._action_buttons:
             b.setEnabled(connected)
         self.fun_mode.setEnabled(connected)
+        if hasattr(self, "rotation_tab"):
+            self.rotation_tab.update_controls()
         if not addr:
             self.info_label.setText("No display selected")
         elif connected:
@@ -513,7 +528,7 @@ class MainWindow(QMainWindow):
         self.manager.scan(5.0)
 
     def _connect_selected(self) -> None:
-        addr = self._current_address()
+        addr = self.current_address()
         if not addr:
             return
         if self.settings.known_devices_only and not self.settings.find(addr):
@@ -524,12 +539,12 @@ class MainWindow(QMainWindow):
         self.manager.connect(addr)
 
     def _disconnect_selected(self) -> None:
-        addr = self._current_address()
+        addr = self.current_address()
         if addr:
             self.manager.disconnect(addr)
 
     def _toggle_hold(self, on: bool) -> None:
-        addr = self._current_address()
+        addr = self.current_address()
         if not addr:
             return
         if on and self.settings.known_devices_only and not self.settings.find(addr):
@@ -543,10 +558,11 @@ class MainWindow(QMainWindow):
             self._refresh_known_table()
 
     def _run(self, command: str, params: dict | None = None) -> None:
-        addr = self._current_address()
+        addr = self.current_address()
         if not addr or not self.manager.is_connected(addr):
             self.log("Connect to a display first.")
             return
+        self._interrupt_rotation(addr)
         self.manager.run(addr, command, params or {})
 
     def _send_text(self) -> None:
@@ -611,7 +627,7 @@ class MainWindow(QMainWindow):
             self.preview.setText("No image")
             self.preview.setPixmap(QPixmap())
             return
-        info = self.manager.device_info(self._current_address() or "")
+        info = self.manager.device_info(self.current_address() or "")
         if info:  # show roughly what the matrix will get
             mode = Qt.KeepAspectRatioByExpanding if self.resize_combo.currentText() == "crop" \
                 else Qt.KeepAspectRatio
@@ -638,7 +654,7 @@ class MainWindow(QMainWindow):
         dev = self.settings.upsert(DeviceEntry(address=addr, name=name, hold=self.manager.is_held(addr)))
         self.save_settings()
         self._refresh_known_table()
-        self._refresh_items()
+        self.refresh_device_list()
         self.log(f"Saved {name or addr} (remote alias “{dev.alias}”)")
 
     def _forget_device(self) -> None:
@@ -650,7 +666,7 @@ class MainWindow(QMainWindow):
             self.manager.set_hold(dev.address, False)
         self.save_settings()
         self._refresh_known_table()
-        self._refresh_items()
+        self.refresh_device_list()
 
     def _refresh_known_table(self) -> None:
         self.known_table.blockSignals(True)
@@ -714,12 +730,19 @@ class MainWindow(QMainWindow):
             self.log(f"Re-established hold on {label}")
         elif event == "hold_changed":
             self.log(f"{'Holding' if data['hold'] else 'Released'} {label}")
-        elif event == "preset_ok":
-            self.log(f"{label}: preset “{data['preset']}” ✓")
-        elif event == "command_ok":
-            self.log(f"{label}: {data['command']} ✓")
+        elif event in ("preset_ok", "command_ok"):
+            if self.manager.rotation_running(addr):
+                return  # the Rotation tab shows progress; don't flood the log
+            what = f"preset “{data['preset']}”" if event == "preset_ok" else data["command"]
+            self.log(f"{label}: {what} ✓")
         elif event == "command_failed":
             self.log(f"{label}: {data['command']} failed — {data['message']}")
+        elif event == "rotation_stopped" and data.get("message"):
+            self.log(f"{label}: rotation stopped – {data['message']}")
+        if event.startswith("rotation_"):
+            self.rotation_tab.on_event(event, data)
+            if event == "rotation_step":
+                return  # frequent; no need to re-render the device list
         if addr:
             self._upsert_item(addr)
         self._update_controls()

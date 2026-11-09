@@ -49,6 +49,8 @@ class Settings:
     devices: list[DeviceEntry] = field(default_factory=list)
     #: Saved presets: ``{"name", "steps": [[command, params], ...]}``.
     presets: list[dict] = field(default_factory=list)
+    #: Saved rotations, see :mod:`pypixelgui.rotation`.
+    rotations: list[dict] = field(default_factory=list)
     #: Settings owned by add-ons (e.g. ``"mqtt"`` for pypixelgui-mqtt). Kept as
     #: plain dicts so the core app round-trips them without knowing their shape.
     plugins: dict[str, dict] = field(default_factory=dict)
@@ -85,6 +87,7 @@ class Settings:
         return cls(
             devices=[DeviceEntry(**d) for d in raw.get("devices", [])],
             presets=list(raw.get("presets", [])),
+            rotations=list(raw.get("rotations", [])),
             plugins=dict(raw.get("plugins", {})),
             known_devices_only=bool(raw.get("known_devices_only", False)),
         )

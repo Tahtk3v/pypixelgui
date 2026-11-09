@@ -83,7 +83,7 @@ def test_preset_over_mqtt(setup):
     bridge, mqtt = setup
     bridge.handle("desk_sign", "preset", b"CYBER")
     assert _results(mqtt) == [{"command": "preset", "ok": True}]
-    assert FakeClient.instances[-1].calls[0][1]["text"] == "CYBER"
+    assert FakeClient.instances[-1].calls[0][1]["file_extension"] == ".gif"
 
 
 def test_settings_live_in_plugin_section():
@@ -91,3 +91,17 @@ def test_settings_live_in_plugin_section():
     MqttSettings(host="broker.lan", port=8883, tls=True).store(s)
     assert s.plugins["mqtt"]["host"] == "broker.lan"
     assert MqttSettings.from_settings(s).port == 8883
+
+
+def test_rotation_over_mqtt(setup):
+    bridge, mqtt = setup
+    bridge.settings.rotations = [{"name": "Shop", "loop": True,
+                                  "items": [{"preset": "ON AIR", "seconds": 1}]}]
+    bridge.handle("desk_sign", "rotation", b"shop")
+    assert bridge.manager.rotation_running("AA:BB")
+    bridge.handle("desk_sign", "rotation", b"stop")
+    deadline = time.time() + 2
+    while time.time() < deadline and bridge.manager.rotation_running("AA:BB"):
+        time.sleep(0.02)
+    assert not bridge.manager.rotation_running("AA:BB")
+    assert all(r["ok"] for r in _results(mqtt))
